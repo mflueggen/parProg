@@ -1,15 +1,15 @@
 #define DEV
 
-#ifdef DEV
 #include <iostream>
-#endif
-
 #include <string>     // std::string, std::stoi
-#ifdef DEV
-    #include "pthread.h"
-#else
-    #include <pthread.h>
-#endif
+#include <pthread.h>
+
+
+void *slow_sum(void *range) {
+    return range;
+    //TODO implement me
+}
+
 
 int main(int argc, char *argv[]) {
     const uint32_t thread_count = (uint32_t) std::stoi(argv[1]);
@@ -33,7 +33,31 @@ int main(int argc, char *argv[]) {
     std::cout << start + (thread_count-1)*junk_size << "-" << end << std::endl;
 #endif
 
+    pthread_t threads[thread_count];
+    for (int j = 0; j < thread_count; ++j) {
+        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)j);
+        if (return_code != 0) {
+#ifdef DEV
+            std::cout << "Error while creating thread. Code: " << return_code << std::endl;
+#endif
+            exit(-1);
+        }
+    }
 
+    // Start each thread with a specific range to summate
+    void *results[thread_count];
+    for (int i = 0; i < thread_count; ++i) {
+        pthread_join(threads[i], &results[i]);
+#ifdef DEV
+        std::cout << (uint32_t )results[i] << std::endl;
+#endif
+    }
 
-    return 0;
+    // We assume that the total amount of threads is not big enough for further parallelism. (overhead > summation)
+    uint32_t final_result = 0;
+    for (int i = 0; i < thread_count; ++i) {
+        final_result += (uint32_t) results[i];
+    }
+    std::cout << final_result << std::endl;
+    pthread_exit(nullptr);
 }
