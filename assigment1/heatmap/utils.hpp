@@ -25,10 +25,36 @@ struct hotspot {
   uint32_t end_round;
 };
 
-struct coord {
-  coord(uint32_t x, uint32_t y) : x{x}, y{y} {}
+struct coordinate {
+  coordinate(uint32_t x, uint32_t y) : x{x}, y{y} {}
   uint32_t x;
   uint32_t y;
+
+  static coordinate index_to_coord(uint32_t index, uint32_t width) {
+    const auto y = index / width;
+    return coordinate{index - width * y, y};
+  }
+
+  static uint32_t coord_to_index(const coordinate c, uint32_t width, uint32_t height) {
+    if (c.x >= width)
+      return std::numeric_limits<uint32_t>::max();
+    if (c.y >= height)
+      return std::numeric_limits<uint32_t>::max();
+    return c.y * width + c.x;
+  }
+};
+
+
+struct range {
+
+  bool in(uint32_t x, uint32_t y, uint32_t width) {
+    const auto p = width * y + x;
+    return p >= from && p < to;
+  }
+
+
+  uint32_t from; // inclusive
+  uint32_t to; // exclusive
 };
 
 std::vector<std::string> split(const std::string& str, const char delimiter) {
@@ -67,13 +93,13 @@ std::vector<hotspot> load_hotspots(const char* filename) {
   return hotspots;
 }
 
-std::vector<coord> load_coords(const char* filename) {
+std::vector<coordinate> load_coords(const char* filename) {
 
   std::ifstream file(filename);
 
   std::string line;
   std::getline(file, line);
-  std::vector<coord> coords;
+  std::vector<coordinate> coords;
   while (std::getline(file, line)) {
     const auto words = split(line, ',');
     if (words.size() == 2)
