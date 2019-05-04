@@ -22,23 +22,24 @@ uint64_t end;
 void *slow_sum(void *index) {
 #ifdef LOG
     std::ofstream logfile;
-    logfile.open (std::to_string((int)index) + ".txt");
-    logfile << "Thread " << (int)index << "\n";
+    logfile.open (std::to_string(*((uint64_t *)index)) + ".txt");
+    logfile << "Thread " << *((uint64_t *)index) << "\n";
 #endif
     uint64_t result = 0;
-    uint64_t upper_bound = start + (int)index*junk_size + junk_size - 1;
+    uint64_t upper_bound = start + *((uint64_t *)index)*junk_size + junk_size - 1;
     if (upper_bound > end) {
         upper_bound = end;
     }
-    for (uint64_t i = start + (int)index*junk_size; i <= upper_bound; ++i) {
+    for (uint64_t i = start + *((uint64_t *)index)*junk_size; i <= upper_bound; ++i) {
         result += i;
     }
 #ifdef LOG
-    logfile << start + (int)index*junk_size << "-" << upper_bound << "\n";
+    logfile << start + *((uint64_t *)index)*junk_size << "-" << upper_bound << "\n";
     logfile << "Result: " << result << "\n";
     logfile.close();
 #endif
-    return (void *)result;
+    *((uint64_t *)index) = result;
+    pthread_exit(nullptr);
 }
 
 
@@ -59,8 +60,10 @@ int main(int argc, char *argv[]) {
 
     // Start each thread with a specific range to summate
     pthread_t threads[thread_count];
-    for (int j = 0; j < thread_count; ++j) {
-        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)j);
+    uint64_t thread_com[thread_count];
+    for (uint64_t j = 0; j < thread_count; ++j) {
+        thread_com[j] = j;
+        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)&thread_com[j]);
         if (return_code != 0) {
 #ifdef DEV
             std::cout << "Error while creating thread. Code: " << return_code << std::endl;
@@ -74,7 +77,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < thread_count; ++i) {
         void *res;
         pthread_join(threads[i], &res);
-        result += (uint64_t) res;
+        result += thread_com[i];
 #ifdef DEV
         std::cout << "Teilergebnis " << i <<": " << (uint64_t )results[i] << std::endl;
 #endif
