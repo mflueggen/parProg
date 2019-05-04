@@ -1,8 +1,13 @@
 //#define DEV
 //#define TIMER
+//#define LOG
 
 #ifdef TIMER
 #include <ctime>
+#endif
+
+#ifdef LOG
+#include <fstream>
 #endif
 
 #include <iostream>
@@ -15,6 +20,11 @@ uint64_t start;
 uint64_t end;
 
 void *slow_sum(void *index) {
+#ifdef LOG
+    std::ofstream logfile;
+    logfile.open (std::to_string((int)index) + ".txt");
+    logfile << "Thread " << (int)index << "\n";
+#endif
     uint64_t result = 0;
     uint64_t upper_bound = start + (int)index*junk_size + junk_size - 1;
     if (upper_bound > end) {
@@ -23,6 +33,11 @@ void *slow_sum(void *index) {
     for (uint64_t i = start + (int)index*junk_size; i <= upper_bound; ++i) {
         result += i;
     }
+#ifdef LOG
+    logfile << start + (int)index*junk_size << "-" << upper_bound << "\n";
+    logfile << "Result: " << result << "\n";
+    logfile.close();
+#endif
     return (void *)result;
 }
 
