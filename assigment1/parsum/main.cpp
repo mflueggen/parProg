@@ -6,8 +6,8 @@
 
 
 void *slow_sum(void *range) {
-    uint32_t result = 0;
-    for (int i = ((uint32_t *)range)[0]; i <= ((uint32_t *)range)[1]; ++i) {
+    uint64_t result = 0;
+    for (int i = ((uint64_t *)range)[0]; i <= ((uint64_t *)range)[1]; ++i) {
         result += i;
     }
     return (void *)result;
@@ -15,22 +15,22 @@ void *slow_sum(void *range) {
 
 
 int main(int argc, char *argv[]) {
-    const uint32_t thread_count = (uint32_t) std::stoi(argv[1]);
-    const uint32_t start = (uint32_t) std::stoi(argv[2]);
-    const uint32_t end = (uint32_t) std::stoi(argv[3]);
+    const uint64_t thread_count = (uint64_t) std::stoull(argv[1]);
+    const uint64_t start = (uint64_t) std::stoull(argv[2]);
+    const uint64_t end = (uint64_t) std::stoull(argv[3]);
 
 #ifdef DEV
     std::cout << "Threadcount: " << thread_count << std::endl;
     std::cout << "Calculating sum from " << start << " to " << end  << std::endl;
 #endif
 
-    uint32_t diff = end - start;
-    uint32_t junk_size = diff / thread_count + 1;  // +1 to distribute the remainder to all threads
+    uint64_t diff = end - start;
+    uint64_t junk_size = diff / thread_count + 1;  // +1 to distribute the remainder to all threads
 
 #ifdef DEV
     std::cout << "Doing the following parallel junks:" << std::endl;
 #endif
-    uint32_t ranges[thread_count][2];
+    uint64_t ranges[thread_count][2];
     for (int i = 0; i < thread_count-1; ++i) {
         ranges[i][0] = start + i*junk_size; // including the lower bound
         ranges[i][1] = start + i*junk_size + junk_size - 1; // -1 for excluding the upper bound
@@ -62,14 +62,14 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < thread_count; ++i) {
         pthread_join(threads[i], &results[i]);
 #ifdef DEV
-        std::cout << "Teilergebnis " << i <<": " << (uint32_t )results[i] << std::endl;
+        std::cout << "Teilergebnis " << i <<": " << (uint64_t )results[i] << std::endl;
 #endif
     }
 
     // We assume that the total amount of threads is not big enough for further parallelism. (overhead > summation)
-    uint32_t final_result = 0;
+    uint64_t final_result = 0;
     for (int i = 0; i < thread_count; ++i) {
-        final_result += (uint32_t) results[i];
+        final_result += (uint64_t) results[i];
     }
     std::cout << final_result << std::endl;
     pthread_exit(nullptr);
