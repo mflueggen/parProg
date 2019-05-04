@@ -1,18 +1,26 @@
 //#define DEV
-#define TIMER
+//#define TIMER
 
 #ifdef TIMER
 #include <ctime>
 #endif
 
 #include <iostream>
-#include <string>     // std::string, std::stoi
+#include <string>     // std::string, std::stoull
 #include <pthread.h>
 
+uint64_t junk_size;
+uint64_t thread_count;
+uint64_t start;
+uint64_t end;
 
-void *slow_sum(void *range) {
+void *slow_sum(void *index) {
     uint64_t result = 0;
-    for (int i = ((uint64_t *)range)[0]; i <= ((uint64_t *)range)[1]; ++i) {
+    uint64_t upper_bound = start + (int)index*junk_size + junk_size - 1;
+    if (upper_bound > end) {
+        upper_bound = end;
+    }
+    for (uint64_t i = start + (int)index*junk_size; i <= upper_bound; ++i) {
         result += i;
     }
     return (void *)result;
@@ -23,40 +31,21 @@ int main(int argc, char *argv[]) {
 #ifdef TIMER
     clock_t begin = clock();
 #endif
-    const uint64_t thread_count = (uint64_t) std::stoull(argv[1]);
-    const uint64_t start = (uint64_t) std::stoull(argv[2]);
-    const uint64_t end = (uint64_t) std::stoull(argv[3]);
+    thread_count = (uint64_t) std::stoull(argv[1]);
+    start = (uint64_t) std::stoull(argv[2]);
+    end = (uint64_t) std::stoull(argv[3]);
 
 #ifdef DEV
     std::cout << "Threadcount: " << thread_count << std::endl;
     std::cout << "Calculating sum from " << start << " to " << end  << std::endl;
 #endif
 
-    uint64_t diff = end - start;
-    uint64_t junk_size = diff / thread_count + 1;  // +1 to distribute the remainder to all threads
+    junk_size = ((end - start) / thread_count) + 1;  // +1 to distribute the remainder to all threads
 
-#ifdef DEV
-    std::cout << "Doing the following parallel junks:" << std::endl;
-#endif
-    uint64_t ranges[thread_count][2];
-    for (int i = 0; i < thread_count-1; ++i) {
-        ranges[i][0] = start + i*junk_size; // including the lower bound
-        ranges[i][1] = start + i*junk_size + junk_size - 1; // -1 for excluding the upper bound
-#ifdef DEV
-        std::cout << start + i*junk_size << "-" << start + i*junk_size + junk_size - 1 << std::endl;
-#endif
-    }
-    ranges[thread_count-1][0] = start + (thread_count-1)*junk_size;
-    ranges[thread_count-1][1] = end;
-#ifdef DEV
-    std::cout << start + (thread_count-1)*junk_size << "-" << end << std::endl;
-
-    std::cout << "start threads" << std::endl;
-#endif
-
+    // Start each thread with a specific range to summate
     pthread_t threads[thread_count];
     for (int j = 0; j < thread_count; ++j) {
-        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)ranges[j]);
+        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)j);
         if (return_code != 0) {
 #ifdef DEV
             std::cout << "Error while creating thread. Code: " << return_code << std::endl;
@@ -65,21 +54,19 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Start each thread with a specific range to summate
-    void *results[thread_count];
+    // We assume that the total amount of threads is not big enough for further parallelism. (overhead > summation)
+    uint64_t result = 0;
     for (int i = 0; i < thread_count; ++i) {
-        pthread_join(threads[i], &results[i]);
+        void *res;
+        pthread_join(threads[i], &res);
+        result += (uint64_t) res;
 #ifdef DEV
         std::cout << "Teilergebnis " << i <<": " << (uint64_t )results[i] << std::endl;
 #endif
     }
 
-    // We assume that the total amount of threads is not big enough for further parallelism. (overhead > summation)
-    uint64_t final_result = 0;
-    for (int i = 0; i < thread_count; ++i) {
-        final_result += (uint64_t) results[i];
-    }
-    std::cout << final_result << std::endl;
+    std::cout << result << std::endl;
+
 #ifdef TIMER
     clock_t finish = clock();
     double elapsed_secs = double(finish - begin) / CLOCKS_PER_SEC;
