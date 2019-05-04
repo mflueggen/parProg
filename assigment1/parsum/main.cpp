@@ -1,4 +1,9 @@
-#define DEV
+//#define DEV
+#define TIMER
+
+#ifdef TIMER
+#include <ctime>
+#endif
 
 #include <iostream>
 #include <string>     // std::string, std::stoi
@@ -15,6 +20,9 @@ void *slow_sum(void *range) {
 
 
 int main(int argc, char *argv[]) {
+#ifdef TIMER
+    clock_t begin = clock();
+#endif
     const uint64_t thread_count = (uint64_t) std::stoull(argv[1]);
     const uint64_t start = (uint64_t) std::stoull(argv[2]);
     const uint64_t end = (uint64_t) std::stoull(argv[3]);
@@ -72,5 +80,11 @@ int main(int argc, char *argv[]) {
         final_result += (uint64_t) results[i];
     }
     std::cout << final_result << std::endl;
+#ifdef TIMER
+    clock_t finish = clock();
+    double elapsed_secs = double(finish - begin) / CLOCKS_PER_SEC;
+    std::cout << "Took " << elapsed_secs << " seconds" << std::endl;
+#endif
+
     pthread_exit(nullptr);
 }
