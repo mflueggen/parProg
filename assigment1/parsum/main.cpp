@@ -40,6 +40,7 @@ void *slow_sum(void *index) {
 #endif
     *((uint64_t *)index) = result;
     pthread_exit(nullptr);
+    return nullptr;
 }
 
 
