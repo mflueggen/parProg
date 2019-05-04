@@ -6,8 +6,11 @@
 
 
 void *slow_sum(void *range) {
-    return range;
-    //TODO implement me
+    uint32_t result = 0;
+    for (int i = ((uint32_t *)range)[0]; i <= ((uint32_t *)range)[1]; ++i) {
+        result += i;
+    }
+    return (void *)result;
 }
 
 
@@ -26,16 +29,26 @@ int main(int argc, char *argv[]) {
 
 #ifdef DEV
     std::cout << "Doing the following parallel junks:" << std::endl;
-
+#endif
+    uint32_t ranges[thread_count][2];
     for (int i = 0; i < thread_count-1; ++i) {
+        ranges[i][0] = start + i*junk_size; // including the lower bound
+        ranges[i][1] = start + i*junk_size + junk_size - 1; // -1 for excluding the upper bound
+#ifdef DEV
         std::cout << start + i*junk_size << "-" << start + i*junk_size + junk_size - 1 << std::endl;
+#endif
     }
+    ranges[thread_count-1][0] = start + (thread_count-1)*junk_size;
+    ranges[thread_count-1][1] = end;
+#ifdef DEV
     std::cout << start + (thread_count-1)*junk_size << "-" << end << std::endl;
+
+    std::cout << "start threads" << std::endl;
 #endif
 
     pthread_t threads[thread_count];
     for (int j = 0; j < thread_count; ++j) {
-        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)j);
+        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)ranges[j]);
         if (return_code != 0) {
 #ifdef DEV
             std::cout << "Error while creating thread. Code: " << return_code << std::endl;
@@ -49,7 +62,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < thread_count; ++i) {
         pthread_join(threads[i], &results[i]);
 #ifdef DEV
-        std::cout << (uint32_t )results[i] << std::endl;
+        std::cout << "Teilergebnis " << i <<": " << (uint32_t )results[i] << std::endl;
 #endif
     }
 
