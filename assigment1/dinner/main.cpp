@@ -22,7 +22,6 @@ bool _run;
 void *philosopher_thread(void *args) {
 
   auto* phil = static_cast<philosopher*>(args);
-
 //  std::cout << "Starting " << phil->id << std::endl;
 
   while (_run) {
@@ -39,6 +38,7 @@ void *philosopher_thread(void *args) {
     if (pthread_mutex_unlock(&phil->lock_on_left_fork)) {
       std::cout << "Phil " << phil->id << ": Could not unlock left fork." << std::endl;
     }
+    for (volatile uint32_t i = 0; i < 1'000; ++i) {}
   }
 
 
