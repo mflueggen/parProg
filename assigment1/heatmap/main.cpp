@@ -1,11 +1,13 @@
 #include <pthread.h>
 
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "utils.hpp"
@@ -18,7 +20,7 @@ std::vector<hotspot> _hotspots;
 pthread_barrier_t _barrier;
 
 void *heatmap_worker_thread(void *args) {
-  range *field_range = static_cast<range *>(args);
+  auto *field_range = static_cast<range *>(args);
 
   std::vector<hotspot> hotspots;
 
@@ -85,8 +87,8 @@ int main(int argc, char *argv[]) {
       _heatmaps[0][coordinate::coord_to_index({h.x, h.y}, _width, _height)] = 1.0;
   }
 
-  const auto worker_thread_count = 4;
-  pthread_barrier_init(&_barrier, NULL, worker_thread_count);
+  const auto worker_thread_count = std::max(std::thread::hardware_concurrency(), 5u);
+  pthread_barrier_init(&_barrier, nullptr, worker_thread_count);
   std::vector<pthread_t> threads(worker_thread_count);
   std::vector<range> ranges(worker_thread_count);
   const auto range_size = (_width * _height) / worker_thread_count;
