@@ -1,6 +1,7 @@
 #include <pthread.h>
 
 #include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -88,13 +89,13 @@ int main(int argc, char *argv[]) {
   }
 
   const auto worker_thread_count = std::max(std::thread::hardware_concurrency(), 5u);
+  //const auto worker_thread_count = 32u;
   pthread_barrier_init(&_barrier, nullptr, worker_thread_count);
   std::vector<pthread_t> threads(worker_thread_count);
   std::vector<range> ranges(worker_thread_count);
-  const auto range_size = (_width * _height) / worker_thread_count;
+  const auto range_size = static_cast<uint32_t>(std::ceil(1.0 * _width * _height / worker_thread_count));
 
-
-  for (int i = 0; i < worker_thread_count; ++i) {
+  for (uint32_t i = 0; i < worker_thread_count; ++i) {
     ranges[i].from = i * range_size;
     ranges[i].to = std::min(ranges[i].from + range_size, _width * _height);
     pthread_create(&threads[i], nullptr, heatmap_worker_thread, &ranges[i]);
