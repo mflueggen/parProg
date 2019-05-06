@@ -38,7 +38,7 @@ void *philosopher_thread(void *args) {
     if (pthread_mutex_unlock(&phil->lock_on_left_fork)) {
       std::cout << "Phil " << phil->id << ": Could not unlock left fork." << std::endl;
     }
-    for (volatile uint32_t i = 0; i < 1'000; ++i) {}
+    for (volatile uint32_t i = 0; i < 10'000; ++i) {}
   }
 
 
