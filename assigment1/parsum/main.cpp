@@ -10,61 +10,65 @@
 #include <fstream>
 #endif
 
+#include "InfInt.h"
 #include <iostream>
 #include <string>     // std::string, std::stoull
 #include <pthread.h>
 
-uint64_t junk_size;
-uint64_t thread_count;
-uint64_t start;
-uint64_t end;
+InfInt *junk_size;
+InfInt *thread_count;
+InfInt *start;
+InfInt *end;
 
 void *slow_sum(void *index) {
 #ifdef LOG
     std::ofstream logfile;
-    logfile.open (std::to_string(*((uint64_t *)index)) + ".txt");
-    logfile << "Thread " << *((uint64_t *)index) << "\n";
+    logfile.open ((*((InfInt *)index)).toString() + ".txt");
+    logfile << "Thread " << *((InfInt *)index) << "\n";
 #endif
-    uint64_t result = 0;
-    uint64_t upper_bound = start + *((uint64_t *)index)*junk_size + junk_size - 1;
-    if (upper_bound > end) {
-        upper_bound = end;
+    InfInt result = 0;
+    InfInt upper_bound = (*start) + *((InfInt *)index)*(*junk_size) + (*junk_size) - 1;
+    if (upper_bound > (*end)) {
+        upper_bound = (*end);
     }
-    for (uint64_t i = start + *((uint64_t *)index)*junk_size; i <= upper_bound; ++i) {
+    for (InfInt i = (*start) + *((InfInt *)index)*(*junk_size); i <= upper_bound; ++i) {
         result += i;
     }
 #ifdef LOG
-    logfile << start + *((uint64_t *)index)*junk_size << "-" << upper_bound << "\n";
+    logfile << (*start) + *((InfInt *)index)*(*junk_size) << "-" << upper_bound << "\n";
     logfile << "Result: " << result << "\n";
     logfile.close();
 #endif
-    *((uint64_t *)index) = result;
+    *((InfInt *)index) = result;
     pthread_exit(nullptr);
     return nullptr;
 }
-
 
 int main(int argc, char *argv[]) {
 #ifdef TIMER
     clock_t begin = clock();
 #endif
-    thread_count = (uint64_t) std::stoull(argv[1]);
-    start = (uint64_t) std::stoull(argv[2]);
-    end = (uint64_t) std::stoull(argv[3]);
+    InfInt local_thread_count = (InfInt) std::stoull(argv[1]);
+    thread_count = &local_thread_count;
+    InfInt local_start = (InfInt) std::stoull(argv[2]);
+    start = &local_start;
+    InfInt local_end = (InfInt) std::stoull(argv[3]);
+    end = &local_end;
 
 #ifdef DEV
     std::cout << "Threadcount: " << thread_count << std::endl;
     std::cout << "Calculating sum from " << start << " to " << end  << std::endl;
 #endif
 
-    junk_size = ((end - start) / thread_count) + 1;  // +1 to distribute the remainder to all threads
+    InfInt local_junk_size = (((*end) - (*start)) / (*thread_count).toInt()) + 1;  // +1 to distribute the remainder to all threads
+    junk_size = &local_junk_size;
 
     // Start each thread with a specific range to summate
-    pthread_t threads[thread_count];
-    uint64_t thread_com[thread_count];
-    for (uint64_t j = 0; j < thread_count; ++j) {
+    pthread_t threads[(*thread_count).toInt()];
+    InfInt thread_com[(*thread_count).toInt()];
+    for (uint64_t j = 0; j < (*thread_count).toInt(); ++j) {
         thread_com[j] = j;
-        int return_code = pthread_create(&threads[j], NULL, slow_sum, (void *)&thread_com[j]);
+        int return_code = pthread_create(&threads[j], nullptr, slow_sum, (void *)&thread_com[j]);
         if (return_code != 0) {
 #ifdef DEV
             std::cout << "Error while creating thread. Code: " << return_code << std::endl;
@@ -74,13 +78,13 @@ int main(int argc, char *argv[]) {
     }
 
     // We assume that the total amount of threads is not big enough for further parallelism. (overhead > summation)
-    uint64_t result = 0;
-    for (int i = 0; i < thread_count; ++i) {
+    InfInt result = 0;
+    for (int i = 0; i < (*thread_count).toInt(); ++i) {
         void *res;
         pthread_join(threads[i], &res);
         result += thread_com[i];
 #ifdef DEV
-        std::cout << "Teilergebnis " << i <<": " << (uint64_t )results[i] << std::endl;
+        std::cout << "Teilergebnis " << i <<": " << (InfInt )results[i] << std::endl;
 #endif
     }
 
