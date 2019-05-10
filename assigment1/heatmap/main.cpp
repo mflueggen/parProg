@@ -13,19 +13,36 @@
 
 #include "utils.hpp"
 
+// global variable to describe heatmap
 uint32_t _width;
 uint32_t _height;
 uint32_t _rounds;
+
+// we manage two heatmaps. Each round the "active" heatmap is updated based on the values of the other "old" heatmap
+// that way we don't need to synchronize data bounderies between threads.
+// a heatmap is modeled as an one dimensional array. Using _width and _height we can compute either the two
+// dimensional coordinate from the given index or compute the index given the coordinate.
 std::vector<double> _heatmaps[2];
+// vector of all hotspots
 std::vector<hotspot> _hotspots;
+
+// barrier to synchronize all threads at the end pf one round.
 pthread_barrier_t _barrier;
 
+/**
+ * Function top call for each headmap filling thread.
+ * The thread reads from the old heatmap to compute the values for the current heatmap.
+ * At the end of each round all threads wait for each other to the current heatmap has been completely filled
+ * to be used as the source for the next round.
+ * @param args range *
+ * @return
+ */
 void *heatmap_worker_thread(void *args) {
   auto *field_range = static_cast<range *>(args);
 
   std::vector<hotspot> hotspots;
 
-  // identify and activate all hotspots
+  // identify and activate all hotspots relevant for the given range
   for (const auto& h : _hotspots) {
     if (field_range->in(h.x, h.y, _width)) {
       hotspots.push_back(h);
@@ -39,8 +56,9 @@ void *heatmap_worker_thread(void *args) {
     for (auto i = field_range->from; i < field_range->to; ++i) {
       const auto coord = coordinate::index_to_coord(i, _width);
       double sum = 0;
-      for (int64_t y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
-        for (int64_t x = static_cast<int64_t>(coord.x) - 1; x <= static_cast<int64_t>(coord.x) + 1; ++x) {
+      // for the 3x3 matrix around coord
+      for (auto y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
+        for (auto x = static_cast<int64_t>(coord.x) - 1; x <= static_cast<int64_t>(coord.x) + 1; ++x) {
           const auto index = coordinate::coord_to_index({static_cast<uint32_t>(x), static_cast<uint32_t>(y)}, _width,
                                                         _height);
           if (index < std::numeric_limits<uint32_t>::max()) {
@@ -53,9 +71,11 @@ void *heatmap_worker_thread(void *args) {
 
     // set active hotspots back to one
     for (const auto& h : hotspots) {
-      if (round >= h.start_round &&  round < h.end_round)
+      if (round >= h.start_round && round < h.end_round)
         _heatmaps[current_heatmap_index][coordinate::coord_to_index({h.x, h.y}, _width, _height)] = 1.0;
     }
+
+    // wait until all threads are done working so we can safely switch the active and old heatmap.
     pthread_barrier_wait(&_barrier);
   }
 
@@ -75,6 +95,7 @@ int main(int argc, char *argv[]) {
   _hotspots = load_hotspots(argv[4]);
   std::vector<coordinate> coords;
 
+  // load coords file if given
   if (argc == 6)
     coords = load_coords(argv[5]);
 
@@ -88,12 +109,13 @@ int main(int argc, char *argv[]) {
       _heatmaps[0][coordinate::coord_to_index({h.x, h.y}, _width, _height)] = 1.0;
   }
 
+  // determine thread count dependant on the number of threads the processor has to offer.
   const auto worker_thread_count = std::max(std::thread::hardware_concurrency(), 5u);
   //const auto worker_thread_count = 32u;
   pthread_barrier_init(&_barrier, nullptr, worker_thread_count);
   std::vector<pthread_t> threads(worker_thread_count);
   std::vector<range> ranges(worker_thread_count);
-  const auto range_size = static_cast<uint32_t>(std::ceil(1.0 * _width * _height / worker_thread_count));
+  const auto range_size = (_width * _height + worker_thread_count - 1) / worker_thread_count;
 
   for (uint32_t i = 0; i < worker_thread_count; ++i) {
     ranges[i].from = i * range_size;
@@ -107,9 +129,10 @@ int main(int argc, char *argv[]) {
 
   pthread_barrier_destroy(&_barrier);
 
-  std::ofstream output_file ("output.txt");
+  std::ofstream output_file("output.txt");
   output_file << std::setprecision(std::numeric_limits<double>::max_digits10);
 
+  // output heatmap
   if (coords.empty()) {
     // print result
     auto index = 0u;
@@ -125,8 +148,7 @@ int main(int argc, char *argv[]) {
       }
       output_file << '\n';
     }
-  }
-  else {
+  } else {
     for (const auto& coord : coords) {
       output_file << _heatmaps[_rounds % 2][coordinate::coord_to_index(coord, _width, _height)] << '\n';
     }
