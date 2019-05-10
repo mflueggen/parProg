@@ -32,7 +32,7 @@ void* slow_sum(void* args) {
 #endif
     auto* r = static_cast<range*>(args);
     r->sum = 0;
-    for (unsigned __int128 i = r->from; i < r->to; ++i) {
+    for (unsigned __int128 i = r->from; i <= r->to; ++i) {
         r->sum += i;
     }
 #ifdef LOG
@@ -57,7 +57,10 @@ int main(int argc, char *argv[]) {
     std::cout << "Calculating sum from " << start << " to " << end  << std::endl;
 #endif
 
-    const unsigned __int128 chunk_size = (end - start + thread_count - 1) / thread_count;
+    // The smallest junks would be 2 numbers. However, due to the overhead for managing threads
+    // compared to the simple operation '+', we assume that it is the best solution to make the
+    // chunks as big as possible. The '+1' distributes the remainder to all threads instead of just the last thread.
+    const unsigned __int128 chunk_size = ((end - start) / thread_count) + 1;
 
     // Start each thread with a specific range to summate
     std::vector<pthread_t> threads(thread_count);
@@ -70,14 +73,17 @@ int main(int argc, char *argv[]) {
     for (auto i = 0ul; i < thread_count; ++i) {
       end_of_range = start_of_range + chunk_size;
       if (end_of_range >= end) {
-        end_of_range = end + 1;
+        end_of_range = end;
       }
       ranges.emplace_back(start_of_range, end_of_range, 0);
-      start_of_range = end_of_range;
+      start_of_range = end_of_range + 1;
       int return_code = pthread_create(&threads[i], nullptr, slow_sum, &ranges[i]);
+      if (return_code != 0) {
 #ifdef DEV
-      std::cout << "Error while creating thread. Code: " << return_code << std::endl;
+          std::cout << "Error while creating thread. Code: " << return_code << std::endl;
 #endif
+          exit(-1);
+      }
     }
 
 
