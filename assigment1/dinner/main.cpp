@@ -10,33 +10,51 @@
 struct philosopher {
   uint32_t id;
   uint64_t dinners_eaten;
+  // true, if the left fork is clean and can be used
   std::atomic<bool> left_clean;
+  // true if the right fork is clean and can be used
   std::atomic<bool> right_clean;
 };
 
-
+// Each fork is modeled as a mutex
 std::vector<pthread_mutex_t> _forks;
 std::vector<philosopher*> _philosophers;
-bool _run;
 
+// global variable to signal when the philosophers should stop eating.
+std::atomic<bool> _run;
 
+/**
+ * Thread to model a philosopher.
+ * A philosopher will wait until the fork to the left and right is clean. Then he will grab (get a lock)
+ * both forks as soon as possible.
+ * After dinner, he will mark both forks as dirty to himself and mark them as clean for his neighbors.
+ * @param args philosopher*
+ * @return nullptr
+ */
 void *philosopher_thread(void *args) {
 
   auto* phil = static_cast<philosopher*>(args);
   //std::cout << "Starting " << phil->id << std::endl;
+  // calculate relevant forks for the current philosopher
   auto* lock_on_left_fork = &_forks[phil->id];
   auto* lock_on_right_fork = &_forks[(phil->id + _philosophers.size() - 1) % _philosophers.size()];
 
+  // calculate relevant neighbors to the philosopher. The neighbors are necessary because the philosopher
+  // will inform his two neighbors when he is done eating my marking their forks as clean.
   auto* left_neighbor = _philosophers[(phil->id + 1) % _philosophers.size()];
   auto* right_neighbor = _philosophers[(phil->id + _philosophers.size() - 1) % _philosophers.size()];
 
+  // We use the lefty righty approach to prevent deadlocks
+  // This does not circumvent the starvation problem.
   if (phil->id == 0) {
     std::swap(lock_on_left_fork, lock_on_right_fork);
   }
 
 
+  // endless loop until the main thread sets _run to false.
   while (_run) {
 
+    // both forks need to be clean before the philosopher will grab them.
     if (!phil->right_clean || !phil->left_clean) {
       continue;
     }
@@ -49,6 +67,9 @@ void *philosopher_thread(void *args) {
     }
 
     ++phil->dinners_eaten;
+
+    // after dinner, both forks are dirty.
+    // don't use them until both neighbors have marked them as clean again.
     phil->left_clean = false;
     phil->right_clean = false;
 
@@ -59,6 +80,7 @@ void *philosopher_thread(void *args) {
       std::cout << "Phil " << phil->id << ": Could not unlock left fork." << std::endl;
     }
 
+    // inform neighbors that they can use the forks.
     left_neighbor->right_clean = true;
     right_neighbor->left_clean = true;
   }
@@ -88,6 +110,7 @@ int main(int argc, char* argv[]) {
   _run = true;
 
   for (auto i = 0u; i < philosopher_count; ++i) {
+    // Memory will be freed as the program terminates ;-)
     _philosophers[i] = new philosopher();
     _philosophers[i]->id = i;
     _philosophers[i]->dinners_eaten = 0;
@@ -101,6 +124,7 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // Give the philosophers time to eat.
   sleep(runtime_in_sec);
   _run = false;
 
