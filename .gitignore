@@ -68,3 +68,4 @@ fabric.properties
 .idea
 output.txt
 *.zip
+*.py
