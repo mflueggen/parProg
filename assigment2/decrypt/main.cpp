@@ -1,3 +1,4 @@
+#include <omp.h>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
@@ -44,6 +45,15 @@ int main(int argc, char *argv[]) {
         std::string salt = password.substr(0,2);
         cryptPw.emplace_back(user, salt, password);
     }
+
+    int i, j;
+#pragma omp parallel for num_threads(2) private(j)
+    for (i = 0; i < 4; i++)
+        for (j = 0; j < 4; j++) {
+            printf("%d %d %d\n", i, j, omp_get_thread_num());
+            int r = j*i;
+            if (r > 1) break;
+        }
 
     for (auto password = cryptPw.begin(); password != cryptPw.end(); ++password) {
         for (auto word = dict.begin(); word != dict.end(); ++word) {
