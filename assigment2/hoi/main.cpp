@@ -23,12 +23,12 @@ struct uint512 {
 
 
   uint512 add(T value) const {
-    uint512 result = this;
+    uint512 result = *this;
     result.inc(value);
     return result;
   }
 
-  inline void inc(T value) {
+  void inc(T value) {
 
     if (data[SIZE - 1] <= std::numeric_limits<T>::max() - value) {
       data[SIZE - 1] = this->data[SIZE - 1] + value;
@@ -44,8 +44,7 @@ struct uint512 {
   }
 
   void incremental_inc(T value) {
-    if (value - last_value == 1) inc();
-    else inc(value - last_value);
+    inc(value - last_value);
     last_value = value;
   }
 
@@ -97,7 +96,7 @@ int main(int count, char *args[]) {
   md5s.resize(N);
 #pragma omp parallel for default(none) shared(md5s) private(data)
   for (auto i = 0ul; i < N; ++i) {
-    data.inc(i);
+    data.incremental_inc(i);
     MD5((unsigned char*)(data.data), 64, md5s[i].data());
     //data.inc();
     //MD5((unsigned char*)(data.data), 64, md5s[i].data());
