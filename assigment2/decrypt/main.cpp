@@ -1,9 +1,14 @@
-#include <omp.h>
+//#define TIMER
+//#include <omp.h>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string.h>
+#include <crypt.h>
+#ifdef TIMER
+#include <ctime>
+#endif
 
 //#define GEN_TEST
 
@@ -24,17 +29,12 @@ struct PW {
 };
 
 int main(int argc, char *argv[]) {
+#ifdef TIMER
+    clock_t begin = clock();
+#endif
 #ifndef GEN_TEST
     std::ifstream pwFile(argv[1]);
     std::ifstream dictFile(argv[2]);
-
-    // load dictionary
-    std::vector<std::string> dict;
-    std::string word;
-    //TODO filter all password longer than 8 chars and only use the common prefix. DES implementation of crypt only considers first 8 byte.
-    while (dictFile >> word) {
-        dict.emplace_back(word);
-    }
 
     // load passwords
     //TODO some users may have the same salt (test if the overhead is bigger)
@@ -47,148 +47,107 @@ int main(int argc, char *argv[]) {
         cryptPw.emplace_back(user, salt, password);
     }
 
-//    int i, j;
-//#pragma omp parallel for num_threads(2) private(j)
-//    for (i = 0; i < 4; i++)
-//        for (j = 0; j < 4; j++) {
-//            printf("%d %d %d\n", i, j, omp_get_thread_num());
-//            int r = j*i;
-//            if (r > 1) break;
-//        }
-#pragma omp parallel for default(none) shared(cryptPw, dict) //collapse(2)
-    for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
-        for (auto & word : dict) {
 
-            //TODO schleifen anders durchgehen?? (nicht einfach änderbar, aber höhere parallelisierbarkeit!)
-            // Ideen:
-            //   - omp parallel for
-            //   - omp task
-
-            //TODO wertvergleich so bauen, dass die branch prediction meistens richtig liegt
-
-            //TODO optional nach erstem Treffer abbrechen
-            char *pw = crypt(word.c_str(), (*password).salt.c_str());
-            char *pw0 = crypt((word + '0').c_str(), (*password).salt.c_str());
-            char *pw1 = crypt((word + '1').c_str(), (*password).salt.c_str());
-            char *pw2 = crypt((word + '2').c_str(), (*password).salt.c_str());
-            char *pw3 = crypt((word + '3').c_str(), (*password).salt.c_str());
-            char *pw4 = crypt((word + '4').c_str(), (*password).salt.c_str());
-            char *pw5 = crypt((word + '5').c_str(), (*password).salt.c_str());
-            char *pw6 = crypt((word + '6').c_str(), (*password).salt.c_str());
-            char *pw7 = crypt((word + '7').c_str(), (*password).salt.c_str());
-            char *pw8 = crypt((word + '8').c_str(), (*password).salt.c_str());
-            char *pw9 = crypt((word + '9').c_str(), (*password).salt.c_str());
-            //            std::cout << (*word) + '0' << std::endl;
-            if (    (*password).cryptPw != pw &&
-                    (*password).cryptPw != pw1 &&
-                    (*password).cryptPw != pw2 &&
-                    (*password).cryptPw != pw3 &&
-                    (*password).cryptPw != pw4 &&
-                    (*password).cryptPw != pw5 &&
-                    (*password).cryptPw != pw6 &&
-                    (*password).cryptPw != pw7 &&
-                    (*password).cryptPw != pw8 &&
-                    (*password).cryptPw != pw9 &&
-                    (*password).cryptPw != pw0     ) {
-                //No password matched -> continue
-                // We assume a "jump never" branch prediction
-                continue;
-            }
-//#pragma omp critical
+    std::string word;
+#pragma omp parallel default(none) shared(dictFile, cryptPw, word)
+    {
+        //TODO filter all password longer than 8 chars and only use the common prefix. DES implementation of crypt only considers first 8 byte.
+        #pragma omp single
+        while (dictFile >> word) {
+            #pragma omp task default(none) shared(cryptPw) firstprivate(word)
             {
-                printf("Thread %d of %d found something\n", omp_get_thread_num(), omp_get_num_threads());
-                if ((*password).cryptPw == pw) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word;
-                    //                std::cout << (*password).user << ";" << word << std::endl;
-//                    break;
+                //TODO optimize for branch predictor
+                struct crypt_data cryptData;
+                cryptData.initialized = 0;
+                for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
+                    #pragma omp flush //TODO Test if this improves speed on bigger machine as well
+                    if ((*password).cracked) {
+                        continue;
+                    }
+                    char *pw = crypt_r(word.c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word;
+                        continue;
+                    }
+                    pw = crypt_r((word + '0').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '0';
+                        continue;
+                    }
+                    pw = crypt_r((word + '1').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '1';
+                        continue;
+                    }
+                    pw = crypt_r((word + '2').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '2';
+                        continue;
+                    }
+                    pw = crypt_r((word + '3').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '3';
+                        continue;
+                    }
+                    pw = crypt_r((word + '4').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '4';
+                        continue;
+                    }
+                    pw = crypt_r((word + '5').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '5';
+                        continue;
+                    }
+                    pw = crypt_r((word + '6').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '6';
+                        continue;
+                    }
+                    pw = crypt_r((word + '7').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '7';
+                        continue;
+                    }
+                    pw = crypt_r((word + '8').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '8';
+                        continue;
+                    }
+                    pw = crypt_r((word + '9').c_str(), (*password).salt.c_str(), &cryptData);
+                    if ((*password).cryptPw == pw) {
+                        (*password).cracked = true;
+                        (*password).clearPw = word + '9';
+                        continue;
+                    }
                 }
-                if ((*password).cryptPw == pw0) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '0';
-                    //                std::cout << (*password).user << ";" << word + '0' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw1) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '1';
-                    //                std::cout << (*password).user << ";" << word + '1' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw2) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '2';
-                    //                std::cout << (*password).user << ";" << word + '2' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw3) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '3';
-
-                    //                std::cout << (*password).user << ";" << word + '3' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw4) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '4';
-                    //                std::cout << (*password).user << ";" << word + '4' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw5) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '5';
-                    //                std::cout << (*password).user << ";" << word + '5' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw6) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '6';
-                    //                std::cout << (*password).user << ";" << word + '6' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw7) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '7';
-                    //                std::cout << (*password).user << ";" << word + '7' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw8) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '8';
-                    //                std::cout << (*password).user << ";" << word + '8' << std::endl;
-//                    break;
-                }
-                if ((*password).cryptPw == pw9) {
-                    (*password).cracked = true;
-                    (*password).clearPw = word + '9';
-                    //                std::cout << (*password).user << ";" << word + '9' << std::endl;
-//                    break;
-                }
-            };
+            }
         }
+        #pragma omp taskwait
     }
 
     for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
-        if ((*password).cracked == true)
+        if ((*password).cracked)
             std::cout << (*password).user << ";" << (*password).clearPw << std::endl;
     }
 
-//    // Print passwords
-//    for (auto i = cryptPw.begin();  i != cryptPw.end() ; ++i) {
-//        std::cout << (*i).user << " has the password " << (*i).cryptPw << " with salt " << (*i).salt << std::endl;
-//    }
-
-//    // Print dictionary
-//    for(auto i = dict.begin(); i != dict.end(); ++i)
-//    {
-//        std::cout << *i << std::endl;
-//    }
-
-//    cryptPw.emplace_back("sw", "swhdjrtjktzf");
-//    std::cout << crypt("Ankündigen","Ah") << std::endl;
-//    std::cout << cryptPw[0].salt << std::endl;
 #else
-    std::cout << crypt("Halloo","/B") << std::endl;
+    std::cout << crypt("Ansitz5","/B") << std::endl;
+#endif
+#ifdef TIMER
+    clock_t finish = clock();
+    double elapsed_secs = double(finish - begin) / CLOCKS_PER_SEC;
+    std::cout << "Took " << elapsed_secs << " seconds" << std::endl;
 #endif
     return 0;
 }
