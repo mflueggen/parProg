@@ -1,3 +1,5 @@
+#include <endian.h>
+
 #include "openssl/md5.h"
 
 #include <algorithm>
@@ -13,12 +15,13 @@
 #include <vector>
 
 
+//#define MY_LITTLE_ENDIAN_SYSTEM
+
 template <typename T>
 struct uint512 {
-  static const uint8_t SIZE = 512 / sizeof(T);
+  static const int16_t BLOCKS = 64 / sizeof(T);
 
-  T data[SIZE];
-
+  T data[BLOCKS];
   T last_value = 0;
 
 
@@ -30,14 +33,14 @@ struct uint512 {
 
   void inc(T value) {
 
-    if (data[SIZE - 1] <= std::numeric_limits<T>::max() - value) {
-      data[SIZE - 1] = this->data[SIZE - 1] + value;
+    if (data[BLOCKS - 1] <= std::numeric_limits<T>::max() - value) {
+      data[BLOCKS - 1] = this->data[BLOCKS - 1] + value;
       return;
     }
 
-    data[SIZE - 1] = this->data[SIZE - 1] + value;
+    data[BLOCKS - 1] = this->data[BLOCKS - 1] + value;
 
-    for (uint8_t b = SIZE - 2; b != std::numeric_limits<uint8_t>::max(); --b) {
+    for (int16_t b = BLOCKS - 2; b >= 0; --b) {
       ++data[b];
       if (data[b] != 0) break;
     }
@@ -50,29 +53,59 @@ struct uint512 {
 
 
   void inc() {
-    for (auto b = SIZE - 1;; --b) {
+    for (auto b = BLOCKS - 1; b >=0; --b) {
       ++data[b];
       if(data[b] != 0) break;
-      if (b == 0) break;
     }
+  }
+
+  unsigned char* c_data() const {
+    return (unsigned char*)(data);
+  }
+
+  void reverse_byte_order(unsigned char* dest) {
+    for (uint16_t b = 0; b < BLOCKS; ++b){
+      for (auto p = 0; p < sizeof(T); ++p) {
+        dest[b * BLOCKS + p] = ((unsigned char*)(&data[b]))[sizeof(T) - p - 1];
+      }
+    }
+  }
+
+  void set_byte(uint16_t position, unsigned char byte) {
+    const auto block = BLOCKS - position / sizeof(T) - 1;
+#ifdef MY_LITTLE_ENDIAN_SYSTEM
+    const auto position_in_block = position % sizeof(T);
+#else
+    const auto position_in_block = sizeof(T) - position % sizeof(T) - 1;
+#endif
+    *((unsigned char*)(&data[block]) + position_in_block) = byte;
   }
 };
 
 
 int main(int count, char *args[]) {
 
-  using T = unsigned __int128;
+#ifdef MY_LITTLE_ENDIAN_SYSTEM
+  std::cout << "using little endian mode." << std::endl;
+#endif
+
+
+  using T = uint32_t;
 
 
   if (count <= 3)
     throw std::runtime_error("wrong number of arguments");
 
 
-  uint512<T> data;
-  std::fill(data.data, data.data + uint512<T>::SIZE, 0);
+  uint512<T> initial_data;
+  std::fill(initial_data.data, initial_data.data + uint512<T>::BLOCKS, 0);
 
+  uint8_t pos = 63;
+  unsigned char c;
   for (auto i = 0; args[1][i] != '\0'; i+=2) {
-    std::sscanf(&args[1][i], "%2hhx", &((unsigned char*)(data.data))[i/2]);
+    std::sscanf(&args[1][i], "%2hhx", &c);
+    initial_data.set_byte(pos, c);
+    pos--;
   }
 
   const uint64_t N = std::atol(args[2]);
@@ -82,45 +115,43 @@ int main(int count, char *args[]) {
 //  precomputed_data.resize(N);
 //
 //  for (auto i = 0ul; i < N; ++i) {
-//    std::memcpy(precomputed_data[i].data, data.data, uint512::SIZE);
-//    data.inc();
+//    std::memcpy(precomputed_data[i].initial_data, initial_data.initial_data, uint512::BLOCKS);
+//    initial_data.inc();
 //  }
 //
   auto end = std::chrono::high_resolution_clock::now();
-//  std::cout << "Precompute data: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()  << " ms" << std::endl;
+//  std::cout << "Precompute initial_data: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()  << " ms" << std::endl;
 
 
 
   start = std::chrono::high_resolution_clock::now();
   std::vector<std::array<unsigned char, 16>> md5s;
   md5s.resize(N);
-#pragma omp parallel for default(none) shared(md5s) private(data)
+#ifdef MY_LITTLE_ENDIAN_SYSTEM
+  unsigned char buffer[64];
+#pragma omp parallel for default(none) shared(md5s) private(initial_data, buffer)
   for (auto i = 0ul; i < N; ++i) {
-    data.incremental_inc(i);
-    MD5((unsigned char*)(data.data), 64, md5s[i].data());
-    //data.inc();
-    //MD5((unsigned char*)(data.data), 64, md5s[i].data());
+    initial_data.incremental_inc(i);
+    initial_data.reverse_byte_order(buffer);
+    MD5(buffer, 64, md5s[i].data());
   }
+#else
+#pragma omp parallel for default(none) shared(md5s) private(initial_data)
+  for (auto i = 0ul; i < N; ++i) {
+    initial_data.incremental_inc(i);
+    MD5(initial_data.c_data(), 64, md5s[i].data());
+  }
+#endif
+
   end = std::chrono::high_resolution_clock::now();
   std::cout << "Compute md5s: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count()  << " ms" << std::endl;
 
-//  for (auto j = 0; j < N; ++j) {
-//    for (auto i = 0; i < 16; ++i) {
-//      std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(md5s[j][i]);
-//    }
-//    std::cout << std::endl;
-//  }
-
-
-
-
-  // Hash einlesen
-  // in 512 bit block packen
-
-  // für alle n den md5 bilden
-  // reducen
-
-  // die kleinesten EInträge zurückgeben
+  for (auto j = 0; j < N; ++j) {
+    for (auto i = 0; i < 16; ++i) {
+      std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(md5s[j][i]);
+    }
+    std::cout << std::endl;
+  }
 
 
 
