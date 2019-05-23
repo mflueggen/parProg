@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
         while (dictFile >> word) {
             #pragma omp task default(none) shared(cryptPw) firstprivate(word)
             {
-                //TODO optimize for branch predictor
+                //TODO optimize for branch predictor -> <1% branch misses according to perf
                 struct crypt_data cryptData;
                 cryptData.initialized = 0;
                 for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
