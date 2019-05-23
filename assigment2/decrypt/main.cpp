@@ -54,6 +54,7 @@ int main(int argc, char *argv[]) {
     }
 
     //TODO Test performance with parallel for (better work distirbution/less overhead?)
+    // Include tests for: outer loop only, nested loop, sub task generation
 
     std::string word;
     std::string previousWord;
@@ -62,7 +63,7 @@ int main(int argc, char *argv[]) {
         #pragma omp single
         while (dictFile >> word) {
             if (common_8_prefix(word, previousWord)) {
-                continue;  // skip word with equal first 8 chars. DES only reads first 8 chars of word
+                continue;  // skip word with equal first 8 chars. DES only reads first 8 chars of word. Assumption: dict is sorted
             }
             previousWord = word;
             #pragma omp task default(none) shared(cryptPw) firstprivate(word)
@@ -71,7 +72,7 @@ int main(int argc, char *argv[]) {
                 struct crypt_data cryptData;
                 cryptData.initialized = 0;
                 for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
-                    #pragma omp flush //TODO Test if this improves speed on bigger machine as well
+                    #pragma omp flush //TODO Test if this improves speed on bigger machine as well. maybe dependent on omp thread amount
                     if ((*password).cracked) {
                         continue;
                     }
