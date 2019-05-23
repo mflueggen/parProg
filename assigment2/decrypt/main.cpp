@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
         cryptPw.emplace_back(user, salt, password);
     }
 
+    //TODO Test performance with parallel for (better work distirbution/less overhead?)
 
     std::string word;
 #pragma omp parallel default(none) shared(dictFile, cryptPw, word)
