@@ -28,6 +28,12 @@ struct PW {
     }
 };
 
+bool common_8_prefix(std::string const& word, std::string const& previousWord) {
+    return word.length() > 8 &&  // only check if the new word is longer than 8 chars
+            previousWord.length() >= 8 &&  // previous word needs at least 8 byte
+           std::equal(previousWord.begin(), previousWord.begin() + 8, word.begin());
+}
+
 int main(int argc, char *argv[]) {
 #ifdef TIMER
     clock_t begin = clock();
@@ -50,11 +56,15 @@ int main(int argc, char *argv[]) {
     //TODO Test performance with parallel for (better work distirbution/less overhead?)
 
     std::string word;
-#pragma omp parallel default(none) shared(dictFile, cryptPw, word)
+    std::string previousWord;
+#pragma omp parallel default(none) shared(dictFile, cryptPw, word, previousWord)
     {
-        //TODO filter all password longer than 8 chars and only use the common prefix. DES implementation of crypt only considers first 8 byte.
         #pragma omp single
         while (dictFile >> word) {
+            if (common_8_prefix(word, previousWord)) {
+                continue;  // skip word with equal first 8 chars. DES only reads first 8 chars of word
+            }
+            previousWord = word;
             #pragma omp task default(none) shared(cryptPw) firstprivate(word)
             {
                 //TODO optimize for branch predictor -> <1% branch misses according to perf
