@@ -39,7 +39,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::unordered_map<std::string, std::set<std::string>> salt_map; // salt -> [password_hash]
-    for(auto password: user_map) {
+    for(auto password: user_map) {  // Some users probably used the same salt. This means we only need to calculate the password once. This overhead will decrease performance if all/majority of users use a unique salt.
         salt_map[password.first.substr(0,2)].insert(password.first);
     }
 
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
                 struct crypt_data cryptData;
                 cryptData.initialized = 0;
                 for (auto password = salt_map.begin(); password != salt_map.end(); ++password) {
-                    #pragma omp flush //TODO Test if this improves speed on bigger machine as well. maybe dependent on omp thread amount
+                    #pragma omp flush  // get the latest values to minimize calculations. Slight performance increase according to tests. 
                     if(solved_salts.find(password->first) != solved_salts.end())
                         continue;
                     char *pw = crypt_r(word.c_str(), password->first.c_str(), &cryptData);
