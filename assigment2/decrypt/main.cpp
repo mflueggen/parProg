@@ -1,4 +1,4 @@
-//#define TIMER
+#define TIMER
 //#include <omp.h>
 #include <unistd.h>
 #include <iostream>
@@ -6,6 +6,9 @@
 #include <vector>
 #include <string.h>
 #include <crypt.h>
+#include <unordered_map>
+#include <set>
+
 #ifdef TIMER
 #include <ctime>
 #endif
@@ -44,13 +47,15 @@ int main(int argc, char *argv[]) {
 
     // load passwords
     //TODO some users may have the same salt (test if the overhead is bigger)
-    std::vector<PW> cryptPw;
+    std::unordered_map<std::string, std::vector<std::string>> user_map; // password_hash -> [username]
     std::string line;
+    std::unordered_map<std::string, std::set<std::string>> salt_map; // salt -> [password_hash]
     while(std::getline(pwFile, line)) {
         std::string user = line.substr(0, line.find(':'));
         std::string password = line.substr(line.find(':') + 1);
         std::string salt = password.substr(0,2);
-        cryptPw.emplace_back(user, salt, password);
+        user_map[password].emplace_back(user);
+        salt_map[salt].insert(password);
     }
 
     //TODO Test performance with parallel for (better work distirbution/less overhead?)
@@ -58,7 +63,8 @@ int main(int argc, char *argv[]) {
 
     std::string word;
     std::string previousWord;
-#pragma omp parallel default(none) shared(dictFile, cryptPw, word, previousWord)
+    std::unordered_map<std::string, std::string> decrypt_map; // username -> password
+#pragma omp parallel default(none) shared(dictFile, user_map, decrypt_map, word, previousWord, salt_map)
     {
         #pragma omp single
         while (dictFile >> word) {
@@ -66,80 +72,87 @@ int main(int argc, char *argv[]) {
                 continue;  // skip word with equal first 8 chars. DES only reads first 8 chars of word. Assumption: dict is sorted
             }
             previousWord = word;
-            #pragma omp task default(none) shared(cryptPw) firstprivate(word)
+            #pragma omp task default(none) shared(user_map, decrypt_map, salt_map) firstprivate(word)
             {
                 //TODO optimize for branch predictor -> <1% branch misses according to perf
                 struct crypt_data cryptData;
                 cryptData.initialized = 0;
-                for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
-                    #pragma omp flush //TODO Test if this improves speed on bigger machine as well. maybe dependent on omp thread amount
-                    if ((*password).cracked) {
+                for (auto password = salt_map.begin(); password != salt_map.end(); ++password) {
+                    char *pw = crypt_r(word.c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word;
+                        }
                         continue;
                     }
-                    char *pw = crypt_r(word.c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word;
+                    pw = crypt_r((word + '0').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '0';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '0').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '0';
+                    pw = crypt_r((word + '1').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '1';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '1').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '1';
+                    pw = crypt_r((word + '2').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '2';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '2').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '2';
+                    pw = crypt_r((word + '3').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '3';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '3').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '3';
+                    pw = crypt_r((word + '4').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '4';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '4').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '4';
+                    pw = crypt_r((word + '5').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '5';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '5').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '5';
+                    pw = crypt_r((word + '6').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '6';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '6').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '6';
+                    pw = crypt_r((word + '7').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '7';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '7').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '7';
+                    pw = crypt_r((word + '8').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '8';
+                        }
                         continue;
                     }
-                    pw = crypt_r((word + '8').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '8';
-                        continue;
-                    }
-                    pw = crypt_r((word + '9').c_str(), (*password).salt.c_str(), &cryptData);
-                    if ((*password).cryptPw == pw) {
-                        (*password).cracked = true;
-                        (*password).clearPw = word + '9';
+                    pw = crypt_r((word + '9').c_str(), password->first.c_str(), &cryptData);
+                    if (password->second.find(pw) != password->second.end()) {
+                        for(auto user: user_map[pw]) {
+                            decrypt_map[user] = word + '9';
+                        }
                         continue;
                     }
                 }
@@ -148,9 +161,8 @@ int main(int argc, char *argv[]) {
         #pragma omp taskwait
     }
 
-    for (auto password = cryptPw.begin(); password < cryptPw.end(); ++password) {
-        if ((*password).cracked)
-            std::cout << (*password).user << ";" << (*password).clearPw << std::endl;
+    for (auto user: decrypt_map) {
+        std::cout << user.first << ";" << user.second << std::endl;
     }
 
 #else
