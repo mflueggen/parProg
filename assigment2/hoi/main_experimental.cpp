@@ -62,6 +62,14 @@ struct uint512 {
   }
 
   void reverse_byte_order(unsigned char* dest) const {
+//    // Code is just as fast as code below
+//    T* p = (T*)dest;
+//    for (uint16_t b = 0; b < BLOCKS; ++b){
+//      *p = __builtin_bswap32(data[b]);
+//      ++p;
+//    }
+
+
     for (uint16_t b = 0; b < BLOCKS; ++b){
       for (auto p = 0; p < sizeof(T); ++p) {
         dest[b * sizeof(T) + p] = ((unsigned char*)(&data[b]))[sizeof(T) - p - 1];
@@ -134,7 +142,7 @@ int main(int count, char *args[]) {
 #endif
 
 
-  // Sorting (let's see, if we actually need to sort the whole list)
+  // Sorting
   std::vector<uint64_t> queries;
 
   for (auto i = 3; i < count; ++i) {
@@ -162,6 +170,22 @@ int main(int count, char *args[]) {
     });
   }
 
+//  const auto max = std::max_element(&args[3], &args[count], [](const char* a, const char* b) {
+//    return atol(a) < atol(b);
+//  });
+//
+//  std::cout << *max << std::endl;
+//
+//  // sort md5s
+//  //__gnu_parallel::sort(md5s.begin(), md5s.end(), [](const std::array<unsigned char, 16>& a, const std::array<unsigned char, 16>& b) {
+//  //std::sort(md5s.begin(), md5s.end(), [](const std::array<unsigned char, 16>& a, const std::array<unsigned char, 16>& b) {
+//  std::partial_sort(md5s.begin(), md5s.begin() + atol(*max), md5s.end(), [](const std::array<unsigned char, 16>& a, const std::array<unsigned char, 16>& b) {
+//    for (auto i = 0; i < 16; ++i) {
+//      if (a[i] < b[i]) return true;
+//      if (a[i] > b[i]) return false;
+//    }
+//    return false;
+//  });
 
 #ifdef BENCHMARK
   end = std::chrono::high_resolution_clock::now();
@@ -176,6 +200,13 @@ int main(int count, char *args[]) {
     }
     std::cout << '\n';
   }
+
+//  for (auto j = 0; j < N; ++j) {
+//    for (auto i = 0; i < 16; ++i) {
+//      std::cout << std::hex << std::setfill('0') << std::setw(2) << static_cast<int>(md5s[j][i]);
+//    }
+//    std::cout << std::endl;
+//  }
 
   return 0;
 }
