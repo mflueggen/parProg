@@ -3,6 +3,8 @@ project(heatmap)
 
 set(CMAKE_CXX_STANDARD 17)
 
+add_definitions(-DWITH_OMP)
+
 find_package(OpenMP)
 if (OPENMP_FOUND)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")

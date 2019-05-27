@@ -14,8 +14,6 @@
 
 #include "utils.hpp"
 
-#define  WITH_OMP
-
 int main(int argc, char *argv[]) {
   if (argc > 6) throw std::runtime_error("Wrong number of arguments");
   if (argc < 5) throw std::runtime_error("Wrong number of arguments");
