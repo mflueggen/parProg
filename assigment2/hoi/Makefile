@@ -4,7 +4,7 @@ LIBS = -fopenmp
 CPPFLAGS = -DCONVERT_TO_BIG_ENDIAN -std=c++17 -O3
 
 hoi: $(OBJ)
-	$(CC) $(CPPFLAGS) $(LIBS) -o $@ $(OBJ)
+	$(CC) $(CPPFLAGS) -o $@ $(OBJ) $(LIBS)
 
 %.o: %.cpp
 	$(CC) $(CPPFLAGS) -c $<
