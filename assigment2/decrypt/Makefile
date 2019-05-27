@@ -1,5 +1,11 @@
-decrypt: main.o
-	g++ -O3 -fopenmp -o decrypt main.o -lcrypt
+CXXFLAGS = -O3 -std=c++17 -fopenmp
+LDLIBS = -lcrypt
+BIN = decrypt
 
-main.o: main.cpp
-	g++ -std=c++17 -fopenmp -c main.cpp
+all: $(BIN)
+
+clean:
+	rm -rf $(BIN)
+
+timer: CXXFLAGS += -DTIMER
+timer: clean decrypt
