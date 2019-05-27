@@ -38,14 +38,17 @@ int main(int argc, char *argv[]) {
         user_map[password].emplace_back(user);
     }
 
+    // aggregate all users with the same salt. Do this separately to improve memory layout for caching (not too sure if this works)
     std::unordered_map<std::string, std::set<std::string>> salt_map; // salt -> [password_hash]
-    for(auto password: user_map) {  // Some users probably used the same salt. This means we only need to calculate the password once. This overhead will decrease performance if all/majority of users use a unique salt.
+    for(const auto& password: user_map) {  // Some users probably used the same salt. This means we only need to calculate the password once. This overhead will decrease performance if all/majority of users use a unique salt.
         salt_map[password.first.substr(0,2)].insert(password.first);
     }
 
     //TODO Test performance with parallel for (better work distirbution/less overhead?)
     // Include tests for: outer loop only, nested loop, sub task generation
 
+    // We are using a task based approach since it allows openmp to start the processing while still reading the input dictionary.
+    // Furthermore it prevents a huge block of words in the memory (like a array) which propably improves caching.
     std::string word;
     std::string previousWord;
     std::unordered_map<std::string, std::string> decrypt_map; // username -> password
@@ -61,7 +64,6 @@ int main(int argc, char *argv[]) {
             previousWord = word;
             #pragma omp task default(none) shared(user_map, decrypt_map, salt_map, solved_salts, solutions_per_salt) firstprivate(word)
             {
-                //TODO optimize for branch predictor -> <1% branch misses according to perf
                 struct crypt_data cryptData;
                 cryptData.initialized = 0;
                 for (auto password = salt_map.begin(); password != salt_map.end(); ++password) {
@@ -70,7 +72,7 @@ int main(int argc, char *argv[]) {
                         continue;
                     char *pw = crypt_r(word.c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word;
                         }
                         solutions_per_salt[password->first]++;
@@ -80,7 +82,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '0').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '0';
                         }
                         solutions_per_salt[password->first]++;
@@ -90,7 +92,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '1').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '1';
                         }
                         solutions_per_salt[password->first]++;
@@ -100,7 +102,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '2').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '2';
                         }
                         solutions_per_salt[password->first]++;
@@ -110,7 +112,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '3').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '3';
                         }
                         solutions_per_salt[password->first]++;
@@ -120,7 +122,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '4').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '4';
                         }
                         solutions_per_salt[password->first]++;
@@ -130,7 +132,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '5').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '5';
                         }
                         solutions_per_salt[password->first]++;
@@ -140,7 +142,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '6').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '6';
                         }
                         solutions_per_salt[password->first]++;
@@ -150,7 +152,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '7').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '7';
                         }
                         solutions_per_salt[password->first]++;
@@ -160,7 +162,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '8').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '8';
                         }
                         solutions_per_salt[password->first]++;
@@ -170,7 +172,7 @@ int main(int argc, char *argv[]) {
                     }
                     pw = crypt_r((word + '9').c_str(), password->first.c_str(), &cryptData);
                     if (password->second.find(pw) != password->second.end()) {
-                        for(auto user: user_map[pw]) {
+                        for(const auto& user: user_map[pw]) {
                             decrypt_map[user] = word + '9';
                         }
                         solutions_per_salt[password->first]++;
@@ -184,7 +186,7 @@ int main(int argc, char *argv[]) {
         #pragma omp taskwait
     }
 
-    for (auto user: decrypt_map) {
+    for (const auto& user: decrypt_map) {
         std::cout << user.first << ";" << user.second << std::endl;
     }
 
