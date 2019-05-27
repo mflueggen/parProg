@@ -5,7 +5,7 @@ add_compile_definitions(CONVERT_TO_BIG_ENDIAN BENCHMARK)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(hoi main.cpp)
+add_executable(hoi md5.cpp main.cpp)
 
 find_package(OpenMP)
 if(OpenMP_CXX_FOUND)

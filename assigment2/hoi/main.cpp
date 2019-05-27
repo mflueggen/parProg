@@ -1,7 +1,3 @@
-#include <endian.h>
-
-#include "openssl/md5.h"
-
 #include <algorithm>
 #include <parallel/algorithm>
 #include <array>
@@ -14,6 +10,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+
+#include "md5.hpp"
 
 template <typename T>
 struct uint512 {
@@ -114,13 +112,13 @@ int main(int count, char *args[]) {
     initial_data.incremental_inc(i);
     // this line does not seem to influence the execution time
     initial_data.reverse_byte_order(buffer);
-    MD5(buffer, 64, md5s[i].data());
+    __md5_buffer((char*)buffer, 64, md5s[i].data());
   }
 #else
 #pragma omp parallel for default(none) shared(md5s) firstprivate(initial_data)
   for (auto i = 0ul; i < N; ++i) {
     initial_data.incremental_inc(i);
-    MD5(initial_data.c_data(), 64, md5s[i].data());
+    __md5_buffer((char*)initial_data.c_data(), 64, md5s[i].data());
   }
 #endif
 
