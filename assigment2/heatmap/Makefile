@@ -1,10 +1,9 @@
 CC = g++
 OBJ = main.o
-LIBS = -fopenmp
-CPPFLAGS = -DWITH_OMP -std=c++17 -O3
+CPPFLAGS = -DWITH_OMP -std=c++17 -O3 -fopenmp
 
 heatmap: $(OBJ)
-	$(CC) $(CPPFLAGS) -o $@ $(OBJ) $(LIBS)
+	$(CC) $(CPPFLAGS) -o $@ $(OBJ) 
 
 %.o: %.cpp
 	$(CC) $(CPPFLAGS) -c $<
