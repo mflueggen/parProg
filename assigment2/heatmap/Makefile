@@ -1,6 +1,7 @@
 CC = g++
 OBJ = main.o
 CPPFLAGS = -DWITH_OMP -std=c++17 -O3 -fopenmp
+timer: CPPFLAGS += -DTIMER
 
 heatmap: $(OBJ)
 	$(CC) $(CPPFLAGS) -o $@ $(OBJ) 
@@ -11,3 +12,6 @@ heatmap: $(OBJ)
 clean:
 	rm heatmap $(OBJ)
 
+all: heatmap
+
+timer: clean heatmap

@@ -41,8 +41,9 @@ int main(int argc, char *argv[]) {
   heatmaps[0].resize(width * height);
   heatmaps[1].resize(width * height);
 
-
+#ifdef TIMER
   const auto start = std::chrono::high_resolution_clock::now();
+#endif
 
   for (const auto& h : hotspots) {
     if (h.start_round == 0)
@@ -86,10 +87,13 @@ int main(int argc, char *argv[]) {
     // ---> barrier here
   }
 
+#ifdef TIMER
+
   const auto end = std::chrono::high_resolution_clock::now();
 
   std::cout << "Runtime: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms"
             << std::endl;
+#endif
 
   std::ofstream output_file("output.txt");
   output_file << std::setprecision(4) << std::fixed;

@@ -4,6 +4,7 @@ project(heatmap)
 set(CMAKE_CXX_STANDARD 17)
 
 add_definitions(-DWITH_OMP)
+add_definitions(-DTIMER)
 
 find_package(OpenMP)
 if (OPENMP_FOUND)
