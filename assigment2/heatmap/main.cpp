@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   // that way we don't need to synchronize data bounderies between threads.
   // a heatmap is modeled as an one dimensional array. Using _width and _height we can compute either the two
   // dimensional coordinate from the given index or compute the index given the coordinate.
-  std::vector<double> heatmaps[2];
+  std::vector<long double> heatmaps[2];
 
   // vector of all hotspots
   std::vector<hotspot> hotspots = load_hotspots(argv[4]);
@@ -54,25 +54,23 @@ int main(int argc, char *argv[]) {
 
 
   for (auto round = 1u; round <= rounds; ++round) {
-    const auto current_heatmap_index = round % 2;
-    const auto old_heatmap_index = (current_heatmap_index + 1) % 2;
 
 #ifdef WITH_OMP
 #pragma omp parallel for default(none) shared(heatmaps)
 #endif
     for (auto i = 0ul; i < width * height; ++i) {
       const auto coord = coordinate::index_to_coord(i, width);
-      double sum = 0;
+      long double sum = 0.0;
 
       //split kernel: 1x3 and 3x1
       for (auto y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
           const auto index = coordinate::coord_to_index({static_cast<uint32_t>(coord.x), static_cast<uint32_t>(y)}, width,
                                                         height);
           if (index < std::numeric_limits<uint32_t>::max()) {
-              sum += heatmaps[old_heatmap_index][index];
+              sum += heatmaps[0][index];
           }
       }
-      heatmaps[current_heatmap_index][i] = sum / 3.0;
+      heatmaps[1][i] = sum / 3.0;
     }
 
 
@@ -81,7 +79,7 @@ int main(int argc, char *argv[]) {
 #endif
       for (auto i = 0ul; i < width * height; ++i) {
           const auto coord = coordinate::index_to_coord(i, width);
-          double sum = 0.0;
+          long double sum = 0.0;
 
           //split kernel: 1x3 and 3x1
 
@@ -89,10 +87,10 @@ int main(int argc, char *argv[]) {
               const auto index = coordinate::coord_to_index({static_cast<uint32_t>(x), static_cast<uint32_t>(coord.y)}, width,
                                                             height);
               if (index < std::numeric_limits<uint32_t>::max()) {
-                  sum += heatmaps[current_heatmap_index][index];
+                  sum += heatmaps[1][index];
               }
           }
-          heatmaps[current_heatmap_index][i] = sum / 3.0;
+          heatmaps[0][i] = sum / 3.0;
       }
 
 
@@ -100,7 +98,7 @@ int main(int argc, char *argv[]) {
     for (auto h = 0; h < hotspots.size(); ++h) {
       const auto& hotspot = hotspots[h];
       if (round >= hotspot.start_round && round < hotspot.end_round)
-        heatmaps[current_heatmap_index][coordinate::coord_to_index({hotspot.x, hotspot.y}, width, height)] = 1.0;
+        heatmaps[0][coordinate::coord_to_index({hotspot.x, hotspot.y}, width, height)] = 1.0;
     }
 
     // wait until all threads are done working so we can safely switch the active and old heatmap.
@@ -124,7 +122,7 @@ int main(int argc, char *argv[]) {
     auto index = 0u;
     for (uint32_t y = 0; y < height; ++y) {
       for (uint32_t x = 0; x < width; ++x) {
-        const auto value = heatmaps[rounds % 2][index];
+        const auto value = heatmaps[0][index];
         if (value > 0.9) {
           output_file << 'X';
         } else {
@@ -136,7 +134,7 @@ int main(int argc, char *argv[]) {
     }
   } else {
     for (const auto& coord : coords) {
-      output_file << heatmaps[rounds % 2][coordinate::coord_to_index(coord, width, height)] << '\n';
+      output_file << heatmaps[0][coordinate::coord_to_index(coord, width, height)] << '\n';
     }
   }
 
