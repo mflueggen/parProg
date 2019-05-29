@@ -45,10 +45,13 @@ int main(int argc, char *argv[]) {
   const auto start = std::chrono::high_resolution_clock::now();
 #endif
 
-  for (const auto& h : hotspots) {
-    if (h.start_round == 0)
+#ifdef WITH_OMP
+#pragma omp parallel for default(none) shared(hotspots, heatmaps)
+#endif
+  for (auto h=hotspots.begin(); h <= hotspots.end(); ++h) {
+    if (h->start_round == 0)
       // activate hotspot on "old" heatmap
-      heatmaps[0][coordinate::coord_to_index({h.x, h.y}, width, height)] = 1.0;
+      heatmaps[0][coordinate::coord_to_index({h->x, h->y}, width, height)] = 1.0;
   }
 
 
@@ -62,7 +65,7 @@ int main(int argc, char *argv[]) {
       const auto coord = coordinate::index_to_coord(i, width);
       double sum = 0.0;
 
-      //split kernel: 1x3 and 3x1
+      //split kernel: 3x1
       for (auto y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
           const auto index = coordinate::coord_to_index({static_cast<uint32_t>(coord.x), static_cast<uint32_t>(y)}, width,
                                                         height);
@@ -81,8 +84,7 @@ int main(int argc, char *argv[]) {
           const auto coord = coordinate::index_to_coord(i, width);
           double sum = 0.0;
 
-          //split kernel: 1x3 and 3x1
-
+          //split kernel: 1x3
           for (auto x = static_cast<int64_t>(coord.x) - 1; x <= static_cast<int64_t>(coord.x) + 1; ++x) {
               const auto index = coordinate::coord_to_index({static_cast<uint32_t>(x), static_cast<uint32_t>(coord.y)}, width,
                                                             height);
@@ -93,7 +95,9 @@ int main(int argc, char *argv[]) {
           heatmaps[0][i] = sum / 3.0;
       }
 
-
+#ifdef WITH_OMP
+#pragma omp parallel for default(none) shared(hotspots, heatmaps, round)
+#endif
     // set active hotspots back to one
     for (auto h = 0; h < hotspots.size(); ++h) {
       const auto& hotspot = hotspots[h];
