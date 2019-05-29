@@ -63,18 +63,38 @@ int main(int argc, char *argv[]) {
     for (auto i = 0ul; i < width * height; ++i) {
       const auto coord = coordinate::index_to_coord(i, width);
       double sum = 0;
-      // for the 3x3 matrix around coord
+
+      //split kernel: 1x3 and 3x1
       for (auto y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
-        for (auto x = static_cast<int64_t>(coord.x) - 1; x <= static_cast<int64_t>(coord.x) + 1; ++x) {
-          const auto index = coordinate::coord_to_index({static_cast<uint32_t>(x), static_cast<uint32_t>(y)}, width,
+          const auto index = coordinate::coord_to_index({static_cast<uint32_t>(coord.x), static_cast<uint32_t>(y)}, width,
                                                         height);
           if (index < std::numeric_limits<uint32_t>::max()) {
-            sum += heatmaps[old_heatmap_index][index];
+              sum += heatmaps[old_heatmap_index][index];
           }
-        }
       }
-      heatmaps[current_heatmap_index][i] = sum / 9.0;
+      heatmaps[current_heatmap_index][i] = sum / 3.0;
     }
+
+
+#ifdef WITH_OMP
+#pragma omp parallel for default(none) shared(heatmaps)
+#endif
+      for (auto i = 0ul; i < width * height; ++i) {
+          const auto coord = coordinate::index_to_coord(i, width);
+          double sum = 0.0;
+
+          //split kernel: 1x3 and 3x1
+
+          for (auto x = static_cast<int64_t>(coord.x) - 1; x <= static_cast<int64_t>(coord.x) + 1; ++x) {
+              const auto index = coordinate::coord_to_index({static_cast<uint32_t>(x), static_cast<uint32_t>(coord.y)}, width,
+                                                            height);
+              if (index < std::numeric_limits<uint32_t>::max()) {
+                  sum += heatmaps[current_heatmap_index][index];
+              }
+          }
+          heatmaps[current_heatmap_index][i] = sum / 3.0;
+      }
+
 
     // set active hotspots back to one
     for (auto h = 0; h < hotspots.size(); ++h) {
