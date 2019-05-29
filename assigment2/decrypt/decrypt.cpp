@@ -57,11 +57,19 @@ int main(int argc, char *argv[]) {
         words.emplace_back(word);
     }
 
-    //TODO Test performance with parallel for (better work distirbution/less overhead?)
-    // Include tests for: outer loop only, nested loop, sub task generation
-
-    // We are using a task based approach since it allows openmp to start the processing while still reading the input dictionary.
-    // Furthermore it prevents a huge block of words in the memory (like a array) which propably improves caching.
+    // We implemented 2 approaches:
+    // - task based approach since it allows openmp to start the processing while still reading the input dictionary.
+    //   Furthermore it prevents a huge block of words in the memory (like an array) which improves caching
+    // - The parallel for approach that preloads the whole dict (this program...).
+    //
+    // Tests have shown that the second approach is slightly faster for long runtimes. We assume that the preloading of
+    // the dict is optimized by the compiler in contrast to an task approach. Furthermore, the caching can adapt and
+    // reaches similar values to the task approach.
+    // Nevertheless, for shorter runtimes the task based approach would be faster due to the direct processing and the
+    // missing need for cache adaption.
+    //
+    // Since we assume that this program would be executed with a large amount of data, we made a decision for the second approach.
+    // Another general assumption: dict >> passwords
     std::unordered_map<std::string, std::string> decrypt_map; // username -> password
     std::set<std::string> solved_salts;
     std::unordered_map<std::string, uint8_t> solutions_per_salt;
