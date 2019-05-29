@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
   // that way we don't need to synchronize data bounderies between threads.
   // a heatmap is modeled as an one dimensional array. Using _width and _height we can compute either the two
   // dimensional coordinate from the given index or compute the index given the coordinate.
-  std::vector<long double> heatmaps[2];
+  std::vector<double> heatmaps[2];
 
   // vector of all hotspots
   std::vector<hotspot> hotspots = load_hotspots(argv[4]);
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 #endif
     for (auto i = 0ul; i < width * height; ++i) {
       const auto coord = coordinate::index_to_coord(i, width);
-      long double sum = 0.0;
+      double sum = 0.0;
 
       //split kernel: 1x3 and 3x1
       for (auto y = static_cast<int64_t>(coord.y) - 1; y <= static_cast<int64_t>(coord.y) + 1; ++y) {
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 #endif
       for (auto i = 0ul; i < width * height; ++i) {
           const auto coord = coordinate::index_to_coord(i, width);
-          long double sum = 0.0;
+          double sum = 0.0;
 
           //split kernel: 1x3 and 3x1
 
