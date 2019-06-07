@@ -14,8 +14,14 @@ ARCH=$(shell uname -m)
 ifeq ($(ARCH),ppc64le)
 	CFLAGS += -maltivec -mabi=altivec
 else
-	CFLAGS += -msse2
-	# Or just go on using AVX
+    AVX=$(shell grep -o 'avx[^ ]*' /proc/cpuinfo | head -n1)
+    ifeq ($(AVX),avx)
+        CFLAGS += -mavx
+    else ifeq ($(AVX),avx2)
+        CFLAGS += -mavx2
+    else
+	    CFLAGS += -msse2
+    endif
 endif
 
 all: filter
@@ -33,7 +39,7 @@ stop:
 	killall make
 
 localrun: filter
-	./simdvid.py -s $(VIDEO) | ./filter | ./simdvid.py -r
+	python3.6 ./simdvid.py -s $(VIDEO) | ./filter | python3.6 ./simdvid.py -r
 
 clean:
 	$(RM) filter
