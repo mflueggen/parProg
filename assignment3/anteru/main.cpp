@@ -182,4 +182,6 @@ int main ()
     clReleaseProgram (program);
 
     clReleaseContext (context);
+
+//    https://anteru.net/blog/2012/getting-started-with-opencl-part-3/
 }
