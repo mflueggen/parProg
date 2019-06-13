@@ -43,6 +43,28 @@ void CheckError (cl_int error, std::string msg)
     }
 }
 
+std::string LoadKernel (const char* name)
+{
+    std::ifstream in(name);
+    std::string result (
+            (std::istreambuf_iterator<char> (in)),
+            std::istreambuf_iterator<char> ());
+    return result;
+}
+
+cl_program CreateProgram (const std::string& source,
+                          cl_context context)
+{
+    size_t lengths [1] = { source.size () };
+    const char* sources [1] = { source.data () };
+
+    cl_int error = 0;
+    cl_program program = clCreateProgramWithSource (context, 1, sources, lengths, &error);
+    CheckError (error, "Create Program");
+
+    return program;
+}
+
 int main ()
 {
     // http://www.khronos.org/registry/cl/sdk/1.1/docs/man/xhtml/clGetPlatformIDs.html
@@ -87,25 +109,77 @@ int main ()
     const cl_context_properties contextProperties [] =
             {
                     CL_CONTEXT_PLATFORM, reinterpret_cast<cl_context_properties> (platformIds [0]),
-                    0 // 0-terminated list
+                    0, 0
             };
 
     cl_int error = CL_SUCCESS;
     cl_context context = clCreateContext (contextProperties, deviceIdCount,
                                           deviceIds.data (), nullptr, nullptr, &error);
-    CheckError(error, "Context creation failed");
+    CheckError (error, "Create Context");
 
     std::cout << "Context created" << std::endl;
+
+    cl_program program = CreateProgram (LoadKernel ("kernels/saxpy.cl"),
+                                        context);
+
+    CheckError (clBuildProgram (program, deviceIdCount, deviceIds.data (), nullptr, nullptr, nullptr), "Program Build");
+
+    cl_kernel kernel = clCreateKernel (program, "SAXPY", &error);
+    CheckError (error, "Create kernel");
+
+    // Prepare some test data
+    static const size_t testDataSize = 1 << 10;
+    std::vector<float> a (testDataSize), b (testDataSize);
+    for (int i = 0; i < testDataSize; ++i) {
+        a [i] = static_cast<float> (23 ^ i);
+        b [i] = static_cast<float> (42 ^ i);
+    }
+
+    cl_mem aBuffer = clCreateBuffer (context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+                                     sizeof (float) * (testDataSize),
+                                     a.data (), &error);
+    CheckError (error, "Create aBuffer");
+
+    cl_mem bBuffer = clCreateBuffer (context, CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR,
+                                     sizeof (float) * (testDataSize),
+                                     b.data (), &error);
+    CheckError (error, "create bBuffer");
 
     // http://www.khronos.org/registry/cl/sdk/1.1/docs/man/xhtml/clCreateCommandQueue.html
     cl_command_queue queue = clCreateCommandQueue (context, deviceIds [0],
                                                    0, &error);
-    CheckError(error, "Queue creation failed");
+    CheckError (error, "create queue");
 
-    // Here were ready to actually run the code
-//    next part: https://anteru.net/blog/2012/getting-started-with-opencl-part-2/
+    clSetKernelArg (kernel, 0, sizeof (cl_mem), &aBuffer);
+    clSetKernelArg (kernel, 1, sizeof (cl_mem), &bBuffer);
+    static const float two = 2.0f;
+    clSetKernelArg (kernel, 2, sizeof (float), &two);
+
+    // http://www.khronos.org/registry/cl/sdk/1.1/docs/man/xhtml/clEnqueueNDRangeKernel.html
+    const size_t globalWorkSize [] = { testDataSize, 0, 0 };
+    CheckError (clEnqueueNDRangeKernel (queue, kernel, 1,
+                                        nullptr,
+                                        globalWorkSize,
+                                        nullptr,
+                                        0, nullptr, nullptr), "Run kernel");
+
+    // Get the results back to the host
+    // http://www.khronos.org/registry/cl/sdk/1.1/docs/man/xhtml/clEnqueueReadBuffer.html
+    CheckError (clEnqueueReadBuffer (queue, bBuffer, CL_TRUE, 0,
+                                     sizeof (float) * testDataSize,
+                                     b.data (),
+                                     0, nullptr, nullptr), "read result");
+
+    for (float & i : b)
+        std::cout << i << ' ';
 
     clReleaseCommandQueue (queue);
+
+    clReleaseMemObject (bBuffer);
+    clReleaseMemObject (aBuffer);
+
+    clReleaseKernel (kernel);
+    clReleaseProgram (program);
 
     clReleaseContext (context);
 }
