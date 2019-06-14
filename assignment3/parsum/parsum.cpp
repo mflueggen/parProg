@@ -117,43 +117,40 @@ int main ()
     CheckError (error, "Create kernel");
 
     // Prepare some test data
-    static const size_t testDataSize = 1 << 10;
-    std::vector<cl_uint> a (testDataSize), b (testDataSize);
-    for (int i = 0; i < testDataSize; ++i) {
-        a [i] = static_cast<cl_uint> (1);
-        b [i] = static_cast<cl_uint> (10);
-    }
+    static const size_t testDataSize = 5; //TODO ensure that size is not greater than end value. This should be t least the half of amount of numbers to be added
+    std::vector<cl_uint> input(2);
+    input[0] = 1;
+    input[1] = 10;
 
     // Create memory buffers
-    cl::Buffer aBuffer(context,
+    cl::Buffer inputBuffer(context,
                        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                       sizeof (cl_uint) * (testDataSize),
-                       a.data(), &error);
-    CheckError (error, "Create aBuffer");
+                       sizeof (cl_uint) * (2),
+                       input.data(), &error);
+    CheckError (error, "Create inputBuffer");
 
-    cl::Buffer bBuffer(context,
-                       CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+    std::vector<cl_uint> output(testDataSize);
+    cl::Buffer outputBuffer(context,
+                       CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR,
                        sizeof (cl_uint) * (testDataSize),
-                       b.data(), &error);
-    CheckError (error, "Create bBuffer");
+                       output.data(), &error);
+    CheckError (error, "Create outputBuffer");
 
     cl::CommandQueue queue(context, devices[0], 0, &error);
     CheckError (error, "create queue");
     // Set arguments to kernel
-    kernel.setArg(0, aBuffer);
-    kernel.setArg(1, bBuffer);
-    static const cl_uint two = 2;
-    kernel.setArg(2, two);
+    kernel.setArg(0, inputBuffer);
+    kernel.setArg(1, outputBuffer);
 
     cl::NDRange globalWorkSize(testDataSize);
-    cl::NDRange local(cl::NullRange);
+    cl::NDRange local(5);
     error = queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalWorkSize, local);
     CheckError (error, "Run kernel");
 
-    error = queue.enqueueReadBuffer(bBuffer, CL_TRUE, 0, sizeof (cl_uint) * testDataSize, b.data ());
+    error = queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof (cl_uint) * testDataSize, output.data ());
     CheckError(error, "read result");
 
-    for (cl_uint & i : b)
+    for (cl_uint & i : output)
         std::cout << i << ' ';
 
     //No Release due to RAII
