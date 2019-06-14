@@ -9,5 +9,5 @@ __kernel void parsum (__global uint* input, __global uint* output)
 
 	output [get_global_id (0)] = val1;
 
-	//output [get_global_id (0)] = get_num_groups(0);
+	output [get_global_id (0)] = get_num_groups(0);
 }
