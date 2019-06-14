@@ -84,7 +84,7 @@ Sizes FindWorkItemSizes(uint64_t end, uint64_t realItemSize)
 
     //We have less than 256 numbers to add. Do it in one work group
     sizes.local = 0;
-    sizes.global = realItemSize/2;
+    sizes.global = realItemSize;
     return sizes;
 }
 
@@ -186,6 +186,10 @@ int main(int argc, char *argv[])
     // Set arguments to kernel
     kernel.setArg(0, inputBuffer);
     kernel.setArg(1, outputBuffer);
+    if(workGroupSizes.local == 0)
+        kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.global, nullptr);
+    else
+        kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.local, nullptr);
 
     cl::NDRange globalWorkSize(workGroupSizes.global);
     cl::NDRange local;

@@ -1,13 +1,26 @@
 // input[0] == start value to count (e.g. 1)
 // input[1] == end value to count (e.g. 100)
-__kernel void parsum (__global uint* input, __global uint* output)
+__kernel void parsum (__global uint* input, __global uint* output, __local uint *tmp)
 {
-	int val1 = get_global_id (0) + input[0]; // This is ensured to be always less than the end value by the host
-	int val2 = (val1 + get_global_size (0));
+	unsigned int lid = get_local_id(0);
+    unsigned int gid = get_global_id(0);
+
+    int val1 = gid + input[0]; // This is ensured to be always less than the end value by the host
+	int val2 = (val1 + gid);
 	val2 = val2 * (input[1] / val2); // ensure to add 0 if the second value is greater than the end value; val2<(end/2) due to global_size defined by Host
-	val1 += val2;
+	tmp[lid] = val1 + val2;
 
-	output [get_global_id (0)] = val1;
+	barrier(CLK_LOCAL_MEM_FENCE);
 
-	output [get_global_id (0)] = get_num_groups(0);
+
+	if( lid < 128) {tmp[lid] += tmp[lid + 128];} barrier(CLK_LOCAL_MEM_FENCE);
+	if( lid < 64) {tmp[lid] += tmp[lid + 64];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 32) {tmp[lid] += tmp[lid + 32];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 16) {tmp[lid] += tmp[lid + 16];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 8) {tmp[lid] += tmp[lid + 8];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 4) {tmp[lid] += tmp[lid + 4];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 2) {tmp[lid] += tmp[lid + 2];} barrier(CLK_LOCAL_MEM_FENCE);
+    if( lid < 1) {tmp[lid] += tmp[lid + 1];} barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (lid == 0) output[get_group_id(0)] = tmp[0];
 }
