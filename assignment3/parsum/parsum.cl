@@ -1,4 +1,4 @@
-__kernel void parsum (__global float* x, __global float* y, float a)
+__kernel void parsum (__global uint* x, __global uint* y, uint a)
 {
 	const int i = get_global_id (0);
 

@@ -118,22 +118,22 @@ int main ()
 
     // Prepare some test data
     static const size_t testDataSize = 1 << 10;
-    std::vector<float> a (testDataSize), b (testDataSize);
+    std::vector<cl_uint> a (testDataSize), b (testDataSize);
     for (int i = 0; i < testDataSize; ++i) {
-        a [i] = static_cast<float> (1);
-        b [i] = static_cast<float> (1);
+        a [i] = static_cast<cl_uint> (1);
+        b [i] = static_cast<cl_uint> (10);
     }
 
     // Create memory buffers
     cl::Buffer aBuffer(context,
                        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                       sizeof (float) * (testDataSize),
+                       sizeof (cl_uint) * (testDataSize),
                        a.data(), &error);
     CheckError (error, "Create aBuffer");
 
     cl::Buffer bBuffer(context,
                        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                       sizeof (float) * (testDataSize),
+                       sizeof (cl_uint) * (testDataSize),
                        b.data(), &error);
     CheckError (error, "Create bBuffer");
 
@@ -142,7 +142,7 @@ int main ()
     // Set arguments to kernel
     kernel.setArg(0, aBuffer);
     kernel.setArg(1, bBuffer);
-    static const float two = 2.0f;
+    static const cl_uint two = 2;
     kernel.setArg(2, two);
 
     cl::NDRange globalWorkSize(testDataSize);
@@ -150,10 +150,10 @@ int main ()
     error = queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalWorkSize, local);
     CheckError (error, "Run kernel");
 
-    error = queue.enqueueReadBuffer(bBuffer, CL_TRUE, 0, sizeof (float) * testDataSize, b.data ());
+    error = queue.enqueueReadBuffer(bBuffer, CL_TRUE, 0, sizeof (cl_uint) * testDataSize, b.data ());
     CheckError(error, "read result");
 
-    for (float & i : b)
+    for (cl_uint & i : b)
         std::cout << i << ' ';
 
     //No Release due to RAII
