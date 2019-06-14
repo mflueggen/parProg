@@ -5,6 +5,9 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#ifdef TIMER
+#include <ctime>
+#endif
 
 #ifdef __APPLE__
 #include "OpenCL/cl2.hpp"
@@ -53,6 +56,9 @@ cl::Program BuildProgram (const std::string& source,
 
 int main ()
 {
+#ifdef TIMER
+    clock_t begin = clock();
+#endif
     //select platform
     cl::vector<cl::Platform> platforms;
     cl::Platform::get(&platforms);
@@ -151,6 +157,12 @@ int main ()
         std::cout << i << ' ';
 
     //No Release due to RAII
+
+#ifdef TIMER
+    clock_t finish = clock();
+    double elapsed_secs = double(finish - begin) / CLOCKS_PER_SEC;
+    std::cout << "Took " << elapsed_secs << " seconds" << std::endl;
+#endif
 }
 
 
