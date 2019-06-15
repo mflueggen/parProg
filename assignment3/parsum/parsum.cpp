@@ -18,20 +18,16 @@
 #endif
 
 struct Sizes {
-  unsigned int local;
-  unsigned int global;
+  uint64_t local;
+  uint64_t global;
 };
 
-int roundUp(int numToRound, int multiple)
+int roundDown(int numToRound, int multiple)
 {
     if (multiple == 0)
         return numToRound;
 
-    int remainder = numToRound % multiple;
-    if (remainder == 0)
-        return numToRound;
-
-    return numToRound + multiple - remainder;
+    return numToRound - (numToRound % multiple);
 }
 
 void CheckError (cl_int error, const std::string& msg)
@@ -74,26 +70,26 @@ cl::Program BuildProgram (const std::string& source,
 }
 
 // This function searches for a optimal combination of Global Work Item Size and Work Group Size
-Sizes FindWorkItemSizes(uint64_t start, uint64_t end)
-{
-    //TODO may make it agnostic to current device
-    Sizes sizes = {256, 0};
+Sizes FindWorkItemSizes(uint64_t start, uint64_t end) {
+    uint64_t maxGroupSize = 8192;
+    uint64_t maxItemSize = maxGroupSize*maxGroupSize*maxGroupSize; //This ensures that we never have a range bigger than 32 bit in a single work item
+    Sizes sizes = {256, maxItemSize}; //fix numbers based on test machine
 
-    uint64_t minimumItemSize = ((end - start + 1) / 2) + 1;
-    sizes.global = roundUp(minimumItemSize, sizes.local);
+    uint64_t maximumItemSize = ((end - start + 1) / 2); // add 2 numbers per work item
+    uint64_t preferredItemSize = roundDown(maximumItemSize, sizes.local); //round down to a multiple of the work group size
 
-    if(sizes.global - 1 + start <= end)
+    if (preferredItemSize == 0)
+    { //We have less than 256 numbers to add. Do it in one work group and round down to the next power of 2.
+        uint64_t pow2ItemSize = pow(2, floor(log(maximumItemSize)/log(2)));
+        if (pow2ItemSize == 0) pow2ItemSize = 1;
+        sizes.local = sizes.global = pow2ItemSize;
         return sizes;
-
-
-    //We have less than 256 numbers to add. Do it in one work group and round up to the next power of 2
-    uint64_t pow2ItemSize = pow(2, ceil(log(minimumItemSize)/log(2)));
-    if (pow2ItemSize - 1  + start > end) {
-        std::cerr << "Found no suitable work item size." << std::endl;
-        exit(-1);
     }
-    sizes.local = pow2ItemSize;
-    sizes.global = pow2ItemSize;//8;//minimumItemSize;
+
+    if (preferredItemSize < sizes.global) {
+        sizes.global = preferredItemSize;
+    }
+
     return sizes;
 }
 
@@ -165,17 +161,40 @@ int main(int argc, char *argv[])
 
     Sizes workGroupSizes = FindWorkItemSizes(start, end);
 
-    // Prepare some test data
-    std::vector<cl_uint> input(2);
-    input[0] = start;
-    input[1] = end;
+    std::vector<cl_uint> starts(workGroupSizes.global);
+    std::vector<cl_uint> ranges(workGroupSizes.global);
+    const uint64_t chunk_size = ceil(((double)(end - start) / workGroupSizes.global));
+    uint64_t start_of_range = start;
+    uint64_t end_of_range = 0;
+    for (auto i = 0ul; i < workGroupSizes.global; ++i) {
+        if(start_of_range > end)
+        { // some idle kernels... (not enough time....)
+            starts[i] = 0;
+            ranges[i] = 0;
+            continue;
+        }
+        end_of_range = start_of_range + chunk_size;
+        if (end_of_range >= end) {
+            end_of_range = end;
+        }
+        starts[i] = start_of_range;
+        ranges[i] = end_of_range - start_of_range;
+        start_of_range = end_of_range + 1;
+    }
+
 
     // Create memory buffers
-    cl::Buffer inputBuffer(context,
+    cl::Buffer startsBuffer(context,
                        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                       sizeof (cl_uint) * (2),
-                       input.data(), &error);
-    CheckError (error, "Create inputBuffer");
+                       sizeof (cl_uint) * (workGroupSizes.global),
+                       starts.data(), &error);
+    CheckError (error, "Create startsBuffer");
+
+    cl::Buffer rangesBuffer(context,
+                            CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+                            sizeof (cl_uint) * (workGroupSizes.global),
+                            ranges.data(), &error);
+    CheckError (error, "Create rangesBuffer");
 
     uint numberWorkGroups = workGroupSizes.global / workGroupSizes.local;
 
@@ -189,12 +208,14 @@ int main(int argc, char *argv[])
     cl::CommandQueue queue(context, devices[0], 0, &error);
     CheckError (error, "create queue");
     // Set arguments to kernel
-    kernel.setArg(0, inputBuffer);
-    kernel.setArg(1, outputBuffer);
-    kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.local, nullptr);
+    kernel.setArg(0, startsBuffer);
+    kernel.setArg(1, rangesBuffer);
+    kernel.setArg(2, outputBuffer);
+    kernel.setArg(3, sizeof(cl_uint) * workGroupSizes.local, nullptr);
 
     cl::NDRange globalWorkSize(workGroupSizes.global);
     cl::NDRange local(workGroupSizes.local);
+
 
     error = queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalWorkSize, local);
     CheckError (error, "Run kernel");
