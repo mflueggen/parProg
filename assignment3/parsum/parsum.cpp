@@ -71,9 +71,8 @@ cl::Program BuildProgram (const std::string& source,
 
 // This function searches for a optimal combination of Global Work Item Size and Work Group Size
 Sizes FindWorkItemSizes(uint64_t start, uint64_t end) {
-    uint64_t maxGroupSize = 8192;
-    uint64_t maxItemSize = maxGroupSize*maxGroupSize*maxGroupSize; //This ensures that we never have a range bigger than 32 bit in a single work item
-    Sizes sizes = {256, maxItemSize}; //fix numbers based on test machine
+    uint64_t maxGroupSize = 8192; // This ensures that we never have a range bigger than 32 bit in a single work item
+    Sizes sizes = {256, maxGroupSize}; //fix numbers based on test machine but small enough to run on development hardware
 
     uint64_t maximumItemSize = ((end - start + 1) / 2); // add 2 numbers per work item
     uint64_t preferredItemSize = roundDown(maximumItemSize, sizes.local); //round down to a multiple of the work group size
@@ -181,7 +180,6 @@ int main(int argc, char *argv[])
         ranges[i] = end_of_range - start_of_range;
         start_of_range = end_of_range + 1;
     }
-
 
     // Create memory buffers
     cl::Buffer startsBuffer(context,
