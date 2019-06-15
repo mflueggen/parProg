@@ -181,6 +181,13 @@ int main(int argc, char *argv[])
                        output.data(), &error);
     CheckError (error, "Create outputBuffer");
 
+    std::vector<cl_uint> debug(workGroupSizes.global);
+    cl::Buffer debugBuffer(context,
+                            CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR,
+                            sizeof (cl_uint) * (workGroupSizes.global),
+                            output.data(), &error);
+    CheckError (error, "Create debugBuffer");
+
     cl::CommandQueue queue(context, devices[0], 0, &error);
     CheckError (error, "create queue");
     // Set arguments to kernel
@@ -190,6 +197,7 @@ int main(int argc, char *argv[])
         kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.global, nullptr);
     else
         kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.local, nullptr);
+    kernel.setArg(3, debugBuffer);
 
     cl::NDRange globalWorkSize(workGroupSizes.global);
     cl::NDRange local;
@@ -204,6 +212,12 @@ int main(int argc, char *argv[])
     CheckError(error, "read result");
 
     for (cl_uint & i : output)
+        std::cout << i << ' ';
+    std::cout << std::endl;
+    error = queue.enqueueReadBuffer(debugBuffer, CL_TRUE, 0, sizeof (cl_uint) * workGroupSizes.global, debug.data ());
+    CheckError(error, "read result");
+
+    for (cl_uint & i : debug)
         std::cout << i << ' ';
 
     //No Release due to RAII
