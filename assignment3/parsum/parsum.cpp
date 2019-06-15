@@ -74,10 +74,12 @@ cl::Program BuildProgram (const std::string& source,
 }
 
 // This function searches for a optimal combination of Global Work Item Size and Work Group Size
-Sizes FindWorkItemSizes(uint64_t start, uint64_t end, uint64_t minimumItemSize)
+Sizes FindWorkItemSizes(uint64_t start, uint64_t end)
 {
     //TODO may make it agnostic to current device
     Sizes sizes = {256, 0};
+
+    uint64_t minimumItemSize = ((end - start + 1) / 2) + 1;
     sizes.global = roundUp(minimumItemSize, sizes.local);
 
     if(sizes.global + start <= end)
@@ -161,8 +163,7 @@ int main(int argc, char *argv[])
     cl::Kernel kernel(program, "parsum", &error);
     CheckError (error, "Create kernel");
 
-    uint workItems = ((end - start + 1) / 2) + 1;
-    Sizes workGroupSizes = FindWorkItemSizes(start, end, workItems);
+    Sizes workGroupSizes = FindWorkItemSizes(start, end);
 
     // Prepare some test data
     std::vector<cl_uint> input(2);
