@@ -160,31 +160,33 @@ int main(int argc, char *argv[])
 
     Sizes workGroupSizes = FindWorkItemSizes(start, end);
 
-    std::vector<cl_uint> starts(workGroupSizes.global);
+    std::vector<cl_uint> starts(workGroupSizes.global * 2);
     std::vector<cl_uint> ranges(workGroupSizes.global);
-    const uint64_t chunk_size = ceil(((double)(end - start) / workGroupSizes.global));
+    const uint64_t chunk_size = ((end - start) / workGroupSizes.global);
     uint64_t start_of_range = start;
     uint64_t end_of_range = 0;
-    for (auto i = 0ul; i < workGroupSizes.global; ++i) {
+    for (auto i = 0ul; i < workGroupSizes.global * 2; i += 2) {
         if(start_of_range > end)
         { // some idle kernels... (not enough time....)
             starts[i] = 0;
-            ranges[i] = 0;
+            starts[i+1] = 0;
+            ranges[i/2] = 0;
             continue;
         }
         end_of_range = start_of_range + chunk_size;
         if (end_of_range >= end) {
             end_of_range = end;
         }
-        starts[i] = start_of_range;
-        ranges[i] = end_of_range - start_of_range;
+        starts[i] = static_cast<uint32_t>(start_of_range);
+        starts[i+1] = static_cast<uint32_t>(start_of_range>>32);
+        ranges[i/2] = end_of_range - start_of_range;
         start_of_range = end_of_range + 1;
     }
 
     // Create memory buffers
     cl::Buffer startsBuffer(context,
                        CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
-                       sizeof (cl_uint) * (workGroupSizes.global),
+                       sizeof (cl_uint) * (workGroupSizes.global * 2),
                        starts.data(), &error);
     CheckError (error, "Create startsBuffer");
 
@@ -196,10 +198,10 @@ int main(int argc, char *argv[])
 
     uint numberWorkGroups = workGroupSizes.global / workGroupSizes.local;
 
-    std::vector<cl_uint> output(numberWorkGroups);
+    std::vector<cl_uint> output(numberWorkGroups * 4);
     cl::Buffer outputBuffer(context,
                        CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR,
-                       sizeof (cl_uint) * (numberWorkGroups),
+                       sizeof (cl_uint) * (numberWorkGroups * 4), //possible 128 bit
                        output.data(), &error);
     CheckError (error, "Create outputBuffer");
 
@@ -209,7 +211,7 @@ int main(int argc, char *argv[])
     kernel.setArg(0, startsBuffer);
     kernel.setArg(1, rangesBuffer);
     kernel.setArg(2, outputBuffer);
-    kernel.setArg(3, sizeof(cl_uint) * workGroupSizes.local, nullptr);
+    kernel.setArg(3, sizeof(cl_uint) * workGroupSizes.local * 4, nullptr);
 
     cl::NDRange globalWorkSize(workGroupSizes.global);
     cl::NDRange local(workGroupSizes.local);
@@ -218,15 +220,38 @@ int main(int argc, char *argv[])
     error = queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalWorkSize, local);
     CheckError (error, "Run kernel");
 
-    error = queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof (cl_uint) * numberWorkGroups, output.data ());
+    error = queue.enqueueReadBuffer(outputBuffer, CL_TRUE, 0, sizeof (cl_uint) * numberWorkGroups * 4, output.data ());
     CheckError(error, "read result");
 
 
-    uint64_t sum = 0;
-    for (cl_uint & i : output)
-        sum += i;
+    unsigned __int128 sum = 0;
+    for (uint64_t i = 0; i < output.size(); i += 4) {
+        unsigned __int128 val = ((unsigned __int128) output[i + 0]) << 0  |
+                                ((unsigned __int128) output[i + 1]) << 32 |
+                                ((unsigned __int128) output[i + 2]) << 64 |
+                                ((unsigned __int128) output[i + 3]) << 96;
+        sum += val;
+    }
 
-    std::cout << sum << std::endl;
+
+    std::vector<int> sum_as_string;
+
+    while (sum > 0) {
+      int last_char = sum % 10;
+      sum /= 10;
+      sum_as_string.push_back(last_char);
+    }
+
+    if (sum_as_string.empty())
+      std::cout << 0;
+    else
+    {
+      for (auto it = sum_as_string.rbegin(); it != sum_as_string.rend(); ++it) {
+        std::cout << *it;
+      }
+    }
+
+  std::cout << std::endl;
 
     //No Release due to RAII
 
