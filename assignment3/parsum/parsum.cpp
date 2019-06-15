@@ -253,6 +253,12 @@ int main(int argc, char *argv[])
 
   std::cout << std::endl;
 
+#ifdef DEV
+    for (const auto &out: output) {
+        std::cout << out << std::endl;
+    }
+#endif
+
     //No Release due to RAII
 
 #ifdef TIMER
