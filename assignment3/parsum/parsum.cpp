@@ -82,13 +82,13 @@ Sizes FindWorkItemSizes(uint64_t start, uint64_t end)
     uint64_t minimumItemSize = ((end - start + 1) / 2) + 1;
     sizes.global = roundUp(minimumItemSize, sizes.local);
 
-    if(sizes.global + start <= end)
+    if(sizes.global - 1 + start <= end)
         return sizes;
 
 
     //We have less than 256 numbers to add. Do it in one work group and round up to the next power of 2
     uint64_t pow2ItemSize = pow(2, ceil(log(minimumItemSize)/log(2)));
-    if (pow2ItemSize + start > end) {
+    if (pow2ItemSize - 1  + start > end) {
         std::cerr << "Found no suitable work item size." << std::endl;
         exit(-1);
     }
@@ -216,8 +216,10 @@ int main(int argc, char *argv[])
     error = queue.enqueueReadBuffer(debugBuffer, CL_TRUE, 0, sizeof (cl_uint) * workGroupSizes.global, debug.data ());
     CheckError(error, "read result");
 
+#ifdef DEV
     for (cl_uint & i : debug)
         std::cout << i << ' ';
+#endif
 
     //No Release due to RAII
 
