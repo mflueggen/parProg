@@ -5,6 +5,8 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <cmath>
+
 #ifdef TIMER
 #include <ctime>
 #endif
@@ -72,19 +74,24 @@ cl::Program BuildProgram (const std::string& source,
 }
 
 // This function searches for a optimal combination of Global Work Item Size and Work Group Size
-Sizes FindWorkItemSizes(uint64_t end, uint64_t realItemSize)
+Sizes FindWorkItemSizes(uint64_t start, uint64_t end, uint64_t minimumItemSize)
 {
     //TODO may make it agnostic to current device
     Sizes sizes = {256, 0};
-    sizes.global = roundUp(realItemSize, sizes.local);
+    sizes.global = roundUp(minimumItemSize, sizes.local);
 
-    if(sizes.global <= end)
+    if(sizes.global + start <= end)
         return sizes;
 
 
-    //We have less than 256 numbers to add. Do it in one work group
-    sizes.local = 0;
-    sizes.global = realItemSize;
+    //We have less than 256 numbers to add. Do it in one work group and round up to the next power of 2
+    uint64_t pow2ItemSize = pow(2, ceil(log(minimumItemSize)/log(2)));
+    if (pow2ItemSize + start > end) {
+        std::cerr << "Found no suitable work item size." << std::endl;
+        exit(-1);
+    }
+    sizes.local = pow2ItemSize;
+    sizes.global = pow2ItemSize;//8;//minimumItemSize;
     return sizes;
 }
 
@@ -155,7 +162,7 @@ int main(int argc, char *argv[])
     CheckError (error, "Create kernel");
 
     uint workItems = ((end - start + 1) / 2) + 1;
-    Sizes workGroupSizes = FindWorkItemSizes(end, workItems);
+    Sizes workGroupSizes = FindWorkItemSizes(start, end, workItems);
 
     // Prepare some test data
     std::vector<cl_uint> input(2);
@@ -169,11 +176,8 @@ int main(int argc, char *argv[])
                        input.data(), &error);
     CheckError (error, "Create inputBuffer");
 
-    uint numberWorkGroups;
-    if(workGroupSizes.local > 0)
-        numberWorkGroups = workGroupSizes.global / workGroupSizes.local;
-    else
-        numberWorkGroups = 1;
+    uint numberWorkGroups = workGroupSizes.global / workGroupSizes.local;
+
     std::vector<cl_uint> output(numberWorkGroups);
     cl::Buffer outputBuffer(context,
                        CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR,
@@ -193,18 +197,12 @@ int main(int argc, char *argv[])
     // Set arguments to kernel
     kernel.setArg(0, inputBuffer);
     kernel.setArg(1, outputBuffer);
-    if(workGroupSizes.local == 0)
-        kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.global, nullptr);
-    else
-        kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.local, nullptr);
+    kernel.setArg(2, sizeof(cl_uint) * workGroupSizes.local, nullptr);
     kernel.setArg(3, debugBuffer);
 
     cl::NDRange globalWorkSize(workGroupSizes.global);
-    cl::NDRange local;
-    if (workGroupSizes.local == 0)
-        local = cl::NDRange(cl::NullRange);
-    else
-        local = cl::NDRange(workGroupSizes.local);
+    cl::NDRange local(workGroupSizes.local);
+
     error = queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalWorkSize, local);
     CheckError (error, "Run kernel");
 
