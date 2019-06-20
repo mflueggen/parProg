@@ -43,4 +43,6 @@ __kernel void simulate(const unsigned short width, const unsigned short height,
 
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
+
+
 }

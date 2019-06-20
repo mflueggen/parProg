@@ -1,9 +1,12 @@
+CC = g++
+CPPFLAGS = -std=c++17 -O3
+LDFLAGS = -lOpenCL
+
 
 OBJ = main.o
-CPPFLAGS = -std=c++17 -O3 -lOpenCL
 
 heatmap: $(OBJ)
-	$(CC) $(CPPFLAGS) -o $@ $(OBJ) 
+	$(CC) $(CPPFLAGS) -o $@ $(OBJ) $(LDFLAGS)
 
 %.o: %.cpp
 	$(CC) $(CPPFLAGS) -c $<
