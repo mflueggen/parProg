@@ -17,14 +17,12 @@
 #include "CL/cl2.hpp"
 #endif
 
-// TODO Fix border cases (e.g. from 1 to 2^64-1)
-
 struct Sizes {
   uint64_t local;
   uint64_t global;
 };
 
-int roundDown(int numToRound, int multiple)
+int roundDown(uint64_t numToRound, uint64_t multiple)
 {
     if (multiple == 0)
         return numToRound;

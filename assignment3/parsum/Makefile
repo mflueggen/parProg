@@ -9,3 +9,7 @@ clean:
 	rm -rf $(BIN)
 
 timer: clean $(BIN)
+
+zip:
+	rm -f parsum.zip
+	zip parsum.zip Makefile parsum.*
