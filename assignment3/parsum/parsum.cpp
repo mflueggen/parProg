@@ -122,19 +122,29 @@ int main(int argc, char *argv[])
     }
 #endif
 
-    // select device
+    // select device from platform with cpu as recommended in lecture
     cl::vector<cl::Device> devices;
-    platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
-
-    if (devices.empty()) {
-        std::cerr << "No OpenCL devices found" << std::endl;
-        return 1;
-    } else {
-#ifdef DEV
-        std::cout << "Found " << devices.size() << " device(s)" << std::endl;
-#endif
+    for (auto & platform : platforms) {
+        platform.getDevices(CL_DEVICE_TYPE_CPU, &devices);
+        if (!devices.empty()) {
+            break;
+        }
     }
+    if (devices.empty()) {
+        for (auto & platform : platforms) {
+            platform.getDevices(CL_DEVICE_TYPE_GPU, &devices);
+            if (!devices.empty()) {
+                break;
+            }
+        }
+    }
+    if (devices.empty()) {
+        std::cerr << "No proper OpenCL device found. Abort." << std::endl;
+        return 1;
+    }
+
 #ifdef DEV
+    std::cout << "Found " << devices.size() << " device(s)" << std::endl;
     for (auto & device : devices) {
         std::cout << "\t- " << device.getInfo<CL_DEVICE_NAME>() << std::endl;
     }
