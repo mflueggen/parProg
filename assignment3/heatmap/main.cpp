@@ -21,6 +21,12 @@ void check_err(const cl_int err_code, const std::string function_name) {
 }
 
 int main(int argc, char *argv[]) {
+
+
+#ifdef BENCHMARK
+  auto bench_start = std::chrono::high_resolution_clock::now();
+#endif
+
   if (argc > 6) throw std::runtime_error("Wrong number of arguments");
   if (argc < 5) throw std::runtime_error("Wrong number of arguments");
 
@@ -107,16 +113,29 @@ int main(int argc, char *argv[]) {
     cl::make_kernel<cl_ushort, cl_ushort, cl_ushort, cl::Buffer&, cl_ushort, cl::Buffer&>(program, "simulate", &ret);
   check_err(ret, "cl::make_kernel");
 
+#ifdef BENCHMARK
+  auto bench_end = std::chrono::high_resolution_clock::now();
+  std::cout << "setup time: " << std::chrono::duration_cast<std::chrono::milliseconds>(bench_end - bench_start).count()
+            << " ms" << std::endl;
+  bench_start = std::chrono::high_resolution_clock::now();
+#endif
+
   for (unsigned short round = 1; round <= rounds; ++round) {
     auto event = kernel(cl::EnqueueArgs(command_queue,
                                               cl::NDRange(1, 1),
                                               cl::NDRange(width-2u, height-2u), cl::NDRange(1, 1)),
                               width, height, round, buf_heatmaps, hotspots.size(), buf_hotspots);
-    ret= event.wait();
+    ret = event.wait();
     check_err(ret, "event.wait()");
   }
 
-  ret = cl::copy(command_queue, buf_heatmaps, begin(heatmaps), end(heatmaps));
+#ifdef BENCHMARK
+  bench_end = std::chrono::high_resolution_clock::now();
+  std::cout << "kernel execution time: " << std::chrono::duration_cast<std::chrono::milliseconds>(bench_end - bench_start).count()
+            << " ms" << std::endl;
+#endif
+
+  ret = cl::copy(command_queue, buf_heatmaps, heatmaps.begin(), heatmaps.end());
   check_err(ret, "cl::copy");
 
   std::ofstream output_file("output.txt");

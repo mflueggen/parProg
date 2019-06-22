@@ -37,6 +37,7 @@ __kernel void simulate(const unsigned short width, const unsigned short height,
     }
     get_h(current_heatmap_index, row, col) = sum / 9.0f;
 
+    // Very expensive
     if (h.x < 65535 && round >= h.start_round && round < h.end_round)
       get_h(current_heatmap_index, h.y, h.x) = 1.0f;
 }
