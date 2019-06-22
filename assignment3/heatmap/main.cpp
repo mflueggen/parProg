@@ -107,10 +107,14 @@ int main(int argc, char *argv[]) {
     cl::make_kernel<cl_ushort, cl_ushort, cl_ushort, cl::Buffer&, cl_ushort, cl::Buffer&>(program, "simulate", &ret);
   check_err(ret, "cl::make_kernel");
 
-  kernel(cl::EnqueueArgs(command_queue,
-    cl::NDRange(1, 1),
-    cl::NDRange(width - 2ul, height - 2ul), cl::NullRange),
-    width, height, rounds, buf_heatmaps, hotspots.size(), buf_hotspots);
+  for (unsigned short round = 1; round <= rounds; ++round) {
+    auto event = kernel(cl::EnqueueArgs(command_queue,
+                                              cl::NDRange(1, 1),
+                                              cl::NDRange(width-2u, height-2u), cl::NDRange(1, 1)),
+                              width, height, round, buf_heatmaps, hotspots.size(), buf_hotspots);
+    ret= event.wait();
+    check_err(ret, "event.wait()");
+  }
 
   ret = cl::copy(command_queue, buf_heatmaps, begin(heatmaps), end(heatmaps));
   check_err(ret, "cl::copy");
