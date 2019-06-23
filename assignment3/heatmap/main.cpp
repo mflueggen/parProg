@@ -11,7 +11,9 @@
 
 #include <CL/cl.hpp>
 
-#define get_h(h, y, x) heatmaps[h * width * height + y * width + x]
+#define get_h(h, y, x) heatmaps[h * width * height + (y) * width + (x)]
+#define WG_WIDTH 128
+#define WG_HEIGHT 1
 
 void check_err(const cl_int err_code, const std::string function_name) {
   if (err_code) {
@@ -22,7 +24,6 @@ void check_err(const cl_int err_code, const std::string function_name) {
 
 int main(int argc, char *argv[]) {
 
-
 #ifdef BENCHMARK
   auto bench_start = std::chrono::high_resolution_clock::now();
 #endif
@@ -31,9 +32,16 @@ int main(int argc, char *argv[]) {
   if (argc < 5) throw std::runtime_error("Wrong number of arguments");
 
   // Initialize values
-  const cl_ushort width = std::stoi(argv[1]) + 2;
-  const cl_ushort height = std::stoi(argv[2]) + 2;
+  cl_ushort width = std::stoi(argv[1]) + 2;
+  cl_ushort height = std::stoi(argv[2]) + 2;
   const cl_ushort rounds = std::stoi(argv[3]);
+
+  // width and height need to be divisible by TILE_SIZE
+  const unsigned short padding_right = (width - 2) % WG_WIDTH ? WG_WIDTH - ((width - 2) % WG_WIDTH) : 0;
+  const unsigned short padding_bottom = (height - 2) % WG_HEIGHT ? WG_HEIGHT - ((height - 2) % WG_HEIGHT) : 0;
+
+  width += padding_right;
+  height += padding_bottom;
 
   const size_t SIZE_OF_HEATMAP = width * height * 2;
 
@@ -44,20 +52,23 @@ int main(int argc, char *argv[]) {
   std::vector<cl_float> heatmaps(SIZE_OF_HEATMAP);
 
   // vector of all hotspots
-  std::vector<hotspot> hotspots = load_hotspots(argv[4]);
+  std::vector<hotspot> tmp_hotspots = load_hotspots(argv[4]);
   std::vector<coordinate> coords;
 
   // load coords file if given
   if (argc == 6)
     coords = load_coords(argv[5]);
 
-  for (auto& h : hotspots) {
+  auto hotspots = std::vector<slim_hotspot>(width * height, slim_hotspot{0, 0});
+
+  for (auto& h : tmp_hotspots) {
     // account for "zero border" around the heatmap and shift hotspot
-    ++h.x;
-    ++h.y;
+    hotspots[(h.y + 1) * width + h.x + 1].start_round = h.start_round;
+    hotspots[(h.y + 1) * width + h.x + 1].end_round = h.end_round;
+
     if (h.start_round == 0)
       // activate hotspot on "old" heatmap
-      get_h(0, h.y, h.x) = 1.0;
+      get_h(0, h.y + 1, h.x + 1) = 1.0;
   }
 
   cl_int ret;
@@ -84,7 +95,7 @@ int main(int argc, char *argv[]) {
   auto buf_heatmaps = cl::Buffer(context, CL_MEM_READ_WRITE, SIZE_OF_HEATMAP * sizeof(cl_float), nullptr, &ret);
   check_err(ret, "clCreateBuffer(buf_heatmaps)");
 
-  auto buf_hotspots = cl::Buffer(context, CL_MEM_READ_ONLY, hotspots.size() * sizeof(hotspot), nullptr, &ret);
+  auto buf_hotspots = cl::Buffer(context, CL_MEM_READ_ONLY, hotspots.size() * sizeof(slim_hotspot), nullptr, &ret);
   check_err(ret, "clCreateBuffer(buf_hotspots)");
 
   auto command_queue = cl::CommandQueue(context, device, 0, &ret);
@@ -97,7 +108,7 @@ int main(int argc, char *argv[]) {
   ret = cl::copy(command_queue, hotspots.begin(), hotspots.end(), buf_hotspots);
   check_err(ret, "copy(buf_heatmaps)");
 
-  ret = command_queue.enqueueWriteBuffer(buf_hotspots, CL_TRUE, 0, hotspots.size() * sizeof(hotspot),
+  ret = command_queue.enqueueWriteBuffer(buf_hotspots, CL_TRUE, 0, hotspots.size() * sizeof(slim_hotspot),
     hotspots.data(), nullptr, nullptr);
   check_err(ret, "command_queue.enqueueWriteBuffer(buf_hotspots)");
 
@@ -110,7 +121,7 @@ int main(int argc, char *argv[]) {
   check_err(ret, "cl::Program");
 
   auto kernel =
-    cl::make_kernel<cl_ushort, cl_ushort, cl_ushort, cl::Buffer&, cl_ushort, cl::Buffer&>(program, "simulate", &ret);
+    cl::make_kernel<cl_ushort, cl_short, cl_short, cl_ushort, cl_ushort, cl::Buffer&, cl_ushort, cl::Buffer&>(program, "simulate", &ret);
   check_err(ret, "cl::make_kernel");
 
 #ifdef BENCHMARK
@@ -123,16 +134,17 @@ int main(int argc, char *argv[]) {
   for (unsigned short round = 1; round <= rounds; ++round) {
     auto event = kernel(cl::EnqueueArgs(command_queue,
                                               cl::NDRange(1, 1),
-                                              cl::NDRange(width-2u, height-2u), cl::NDRange(1, 1)),
-                              width, height, round, buf_heatmaps, hotspots.size(), buf_hotspots);
+                                              //cl::NDRange(width-2u, height-2u), cl::NDRange(1, 1)),
+                                              cl::NDRange(width - 2, height - 2), cl::NDRange(WG_WIDTH, WG_HEIGHT)),
+                              width, padding_right + 2, height, padding_bottom + 2, round, buf_heatmaps, hotspots.size(), buf_hotspots);
     ret = event.wait();
     check_err(ret, "event.wait()");
   }
 
 #ifdef BENCHMARK
   bench_end = std::chrono::high_resolution_clock::now();
-  std::cout << "kernel execution time: " << std::chrono::duration_cast<std::chrono::milliseconds>(bench_end - bench_start).count()
-            << " ms" << std::endl;
+  std::cout << "kernel execution time: " << std::chrono::duration_cast<std::chrono::microseconds>(bench_end - bench_start).count()
+            << " µs" << std::endl;
 #endif
 
   ret = cl::copy(command_queue, buf_heatmaps, heatmaps.begin(), heatmaps.end());
@@ -144,8 +156,8 @@ int main(int argc, char *argv[]) {
   // output heatmap
   if (coords.empty()) {
     // print result
-    for (uint32_t y = 1; y < height - 1; ++y) {
-      for (uint32_t x = 1; x < width - 1; ++x) {
+    for (uint32_t y = 1; y < height - padding_bottom - 1; ++y) {
+      for (uint32_t x = 1; x < width - padding_right - 1; ++x) {
         const auto value = get_h(rounds % 2, y, x);
         if (value > 0.9) {
           output_file << 'X';

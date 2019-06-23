@@ -1,4 +1,5 @@
-#define get_h(h, y, x) heatmaps[h * width * height + y * width + x]
+#define get_h(h, y, x) heatmaps[h * width * height + (y) * width + (x)]
+#define TILE_SIZE 32
 
 struct hotspot
 {
@@ -8,36 +9,49 @@ struct hotspot
     unsigned short end_round;
 };
 
-
-__kernel void simulate(const unsigned short width, const unsigned short height,
-                       const unsigned short round, __global float* heatmaps,
-                       const unsigned short num_hotspots, __global const struct hotspot* hotspots)
+struct slim_hotspot
 {
-    const unsigned short col = get_global_id(0);
-    const unsigned short row = get_global_id(1);
+  unsigned short start_round;
+  unsigned short end_round;
+};
 
-    struct hotspot h;
-    h.x = 65535u;
 
-    for (unsigned short i = 0u; i < num_hotspots; ++i) {
-        if (hotspots[i].y == row && hotspots[i].x == col) {
-            h = hotspots[i];
-        }
-    }
+__kernel void simulate(const unsigned short width, const unsigned short padding_right, const unsigned short height,
+                       const unsigned short padding_bottom, const unsigned short round, __global float* heatmaps,
+                       const unsigned short num_hotspots, __global const struct slim_hotspot* hotspots)
+{
+  const unsigned short col = get_global_id(0);
+  const unsigned short row = get_global_id(1);
 
-    const unsigned char current_heatmap_index = round % 2;
-    const unsigned char old_heatmap_index = (current_heatmap_index + 1) % 2;
+  const unsigned char current_heatmap_index = round % 2;
+  const unsigned char old_heatmap_index = (current_heatmap_index + 1) % 2;
 
-    float sum = 0.0f;
-    // for the 3x3 matrix around coord
-    for (unsigned short y = row - 1; y <= row + 1; ++y) {
-      for (unsigned short x = col - 1; x <= col + 1; ++x) {
-        sum += get_h(old_heatmap_index, y, x);
-      }
-    }
-    get_h(current_heatmap_index, row, col) = sum / 9.0f;
+  unsigned short width_diff = width - padding_right - col;
+  width_diff = width_diff >> 15u;
+  width_diff = !width_diff;
 
-    // Very expensive
-    if (h.x < 65535 && round >= h.start_round && round < h.end_round)
-      get_h(current_heatmap_index, h.y, h.x) = 1.0f;
+  unsigned short height_diff = height - padding_bottom - row;
+  height_diff = height_diff >> 15u;
+  height_diff = !height_diff;
+
+  width_diff = width_diff & height_diff;
+
+  float sum = get_h(old_heatmap_index, row, col - 1);
+  sum += get_h(old_heatmap_index, row, col);
+  sum += get_h(old_heatmap_index, row, col + 1);
+
+  sum += get_h(old_heatmap_index, row-1, col - 1);
+  sum += get_h(old_heatmap_index, row-1, col);
+  sum += get_h(old_heatmap_index, row-1, col + 1);
+
+  sum += get_h(old_heatmap_index, row+1, col - 1);
+  sum += get_h(old_heatmap_index, row+1, col);
+  sum += get_h(old_heatmap_index, row+1, col + 1);
+
+  sum = sum * width_diff * 0.1111111111111111f;
+
+  const struct slim_hotspot h = hotspots[row * width + col];
+  unsigned short activate_hotspot = ((unsigned short)(h.start_round - round - 1u)) >> 15; // One, if h.start_round <= round
+  activate_hotspot = activate_hotspot & (((unsigned short)(round - h.end_round)) >> 15) /*One, if round < h.end_round*/;
+  get_h(current_heatmap_index, row, col) = sum + ((1.0f - sum) * activate_hotspot);
 }
