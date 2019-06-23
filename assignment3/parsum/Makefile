@@ -1,5 +1,5 @@
-CXXFLAGS = -O3 -std=c++17 -pthread
-#LDLIBS =
+CXXFLAGS = -O3 -std=c++17
+LDLIBS = -lOpenCL
 BIN = parsum
 timer: CXXFLAGS += -DTIMER
 
@@ -9,3 +9,7 @@ clean:
 	rm -rf $(BIN)
 
 timer: clean $(BIN)
+
+zip:
+	rm -f parsum.zip
+	zip parsum.zip Makefile parsum.*

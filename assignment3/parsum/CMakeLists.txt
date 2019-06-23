@@ -1,7 +1,12 @@
-cmake_minimum_required(VERSION 3.10)
-project(parsum)
-
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+PROJECT(parsum)
+SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 set(CMAKE_CXX_STANDARD 17)
-SET(CMAKE_CXX_FLAGS -pthread)
 
-add_executable(parsum parsum.cpp)
+FIND_PACKAGE(OpenCL REQUIRED)
+INCLUDE_DIRECTORIES(${OPENCL_INCLUDE_DIR})
+
+add_compile_definitions(DEV=1)
+
+ADD_EXECUTABLE(parsum parsum.cpp)
+TARGET_LINK_LIBRARIES(parsum ${OPENCL_LIBRARY})
