@@ -1,0 +1,9 @@
+{
+    "target": "SNAP_N250",
+    "stream_bytes": 64,
+    "operators": {
+        "md5hash": {
+            "source": "hls_operator_md5hash"
+        }
+    }
+}

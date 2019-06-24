@@ -1,0 +1,14 @@
+{
+    "description": "Filter a stream of values by their MD5 hash",
+    "options": {
+        "search": {
+            "short": "s",
+            "type": {
+                "type": "buffer",
+                "size": 16
+            },
+            "description": "The hashed value to look for",
+            "offset": 256
+        }
+    }
+}

@@ -1,0 +1,16 @@
+version: '2'
+
+services:
+  dev:
+    build: .
+    environment:
+      - DISPLAY=host.docker.internal:0.0
+    volumes:
+      - $PWD:/workspace
+    devices:
+      - /dev/fuse
+    cap_add:
+      - SYS_ADMIN
+    security_opt:
+      - apparmor:unconfined
+    working_dir: /workspace
