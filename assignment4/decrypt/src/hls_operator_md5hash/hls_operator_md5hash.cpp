@@ -18,6 +18,8 @@ typedef ap_uint<WORD_IDX_BITS> word_index_t;
 #define ITERATION_RANGE (0x1<<(ITERATION_BITS-1))
 typedef ap_uint<ITERATION_BITS> iteration_ctr_t;
 
+#define ROTATE_LEFT(x, n) (((x) << (n)) | ((x) >> (32-(n))))
+
 // Implemented with pseudo code reference from wikipedia (https://en.wikipedia.org/wiki/MD5#Pseudocode)
 
 const word_index_t G[ITERATION_RANGE] = {
@@ -91,7 +93,7 @@ hash_t md5hash(word_t word) {
     A = D;
     D = C;
     C = B;
-    B = B + (F << s | (F >> (32-s)));
+    B = B + ROTATE_LEFT(F,s);
   }
   a = a + A;
   b = b + B;
@@ -99,7 +101,7 @@ hash_t md5hash(word_t word) {
   d = d + D;
 
   // useful for debugging: https://cryptii.com/pipes/md5-hash
-  hash_t result = (a,b,c,d);
+  hash_t result = (d,c,b,a);
   printf("Hash: ");
   mprint_hex((unsigned char *)&result, 16);
   return result;
