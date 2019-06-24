@@ -71,7 +71,6 @@ hash_t md5hash(word_t word) {
   unit_t B = b;
   unit_t C = c;
   unit_t D = d;
-  printf("a: %u, b: %u\n",(unsigned int) a,(unsigned int) b);
 
   for (iteration_ctr_t i = 0; i < ITERATION_RANGE; ++i) {
     const unit_t w = EXTRACT_UNIT(word, G[i]); //32bit word of the 512bit block. M[g] in pseudo code
@@ -79,27 +78,31 @@ hash_t md5hash(word_t word) {
     const unit_index_t s = S[i];
     // TODO implement the MD5 Hashing Algorithm
     unit_t F;
-    if (0 <= i <= 15)
-      F = (B & C) | ((~B) & D);
-    else if (16 <= i <= 31)
-      F = (D & B) | ((~D) & C);
-    else if (32 <= i <= 47)
-      F = B ^ C ^ D;
-    else if (48 <= i <= 63)
-      F = C ^ (B | (~D));
+    if (0 <= i && i <= 15) {
+      F = (B & C) | ((~B) & D);}
+    else if (16 <= i && i <= 31){
+      F = (D & B) | ((~D) & C);}
+    else if (32 <= i && i <= 47){
+      F = B ^ C ^ D;}
+    else if (48 <= i && i <= 63){
+      F = C ^ (B | (~D));}
 
     F = F + A + k + w;
     A = D;
     D = C;
     C = B;
-    B = B + (F << s);
+    B = B + (F << s | (F >> (32-s)));
   }
   a = a + A;
   b = b + B;
   c = c + C;
   d = d + D;
 
-  return (a,b,c,d);
+  // useful for debugging: https://cryptii.com/pipes/md5-hash
+  hash_t result = (a,b,c,d);
+  printf("Hash: ");
+  mprint_hex((unsigned char *)&result, 16);
+  return result;
 }
 
 void hls_operator_md5hash(mtl_stream &in, mtl_stream &out, hash_t search) {
