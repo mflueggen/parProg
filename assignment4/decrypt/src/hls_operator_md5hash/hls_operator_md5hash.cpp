@@ -48,20 +48,58 @@ const unit_t K[ITERATION_RANGE] = {
   0x6fa87e4f, 0xfe2ce6e0, 0xa3014314, 0x4e0811a1,
   0xf7537e82, 0xbd3af235, 0x2ad7d2bb, 0xeb86d391 };
 
+
+void mprint_hex(unsigned char * buffer, int length)
+{
+  printf("0x");
+  for(int i = 0; i < length; i++) {
+    printf("%02x", buffer[i]);
+  }
+  printf("\n");
+}
+
+
 hash_t md5hash(word_t word) {
+  printf("================= OPERATOR =============================\n");
+  mprint_hex((unsigned char *)&word, 64);
+
   unit_t a = 0x67452301;
   unit_t b = 0xefcdab89;
   unit_t c = 0x98badcfe;
   unit_t d = 0x10325476;
+  unit_t A = a;
+  unit_t B = b;
+  unit_t C = c;
+  unit_t D = d;
+  printf("a: %u, b: %u\n",(unsigned int) a,(unsigned int) b);
 
   for (iteration_ctr_t i = 0; i < ITERATION_RANGE; ++i) {
-    const unit_t w = EXTRACT_UNIT(word, G[i]);
+    const unit_t w = EXTRACT_UNIT(word, G[i]); //32bit word of the 512bit block. M[g] in pseudo code
     const unit_t k = K[i];
     const unit_index_t s = S[i];
     // TODO implement the MD5 Hashing Algorithm
+    unit_t F;
+    if (0 <= i <= 15)
+      F = (B & C) | ((~B) & D);
+    else if (16 <= i <= 31)
+      F = (D & B) | ((~D) & C);
+    else if (32 <= i <= 47)
+      F = B ^ C ^ D;
+    else if (48 <= i <= 63)
+      F = C ^ (B | (~D));
+
+    F = F + A + k + w;
+    A = D;
+    D = C;
+    C = B;
+    B = B + (F << s);
   }
-  hash_t r = 0;
-  return r;
+  a = a + A;
+  b = b + B;
+  c = c + C;
+  d = d + D;
+
+  return (a,b,c,d);
 }
 
 void hls_operator_md5hash(mtl_stream &in, mtl_stream &out, hash_t search) {
