@@ -15,6 +15,11 @@ struct hotspot {
   cl_ushort end_round;
 };
 
+struct slim_hotspot {
+  cl_ushort start_round;
+  cl_ushort end_round;
+};
+
 struct coordinate {
   coordinate(uint32_t x, uint32_t y) : x{x}, y{y} {}
   uint32_t x;
