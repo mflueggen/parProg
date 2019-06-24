@@ -62,8 +62,8 @@ void mprint_hex(unsigned char * buffer, int length)
 
 
 hash_t md5hash(word_t word) {
-  printf("================= OPERATOR =============================\n");
-  mprint_hex((unsigned char *)&word, 64);
+//  printf("================= OPERATOR =============================\n");
+//  mprint_hex((unsigned char *)&word, 64);
 
   unit_t a = 0x67452301;
   unit_t b = 0xefcdab89;
@@ -102,8 +102,8 @@ hash_t md5hash(word_t word) {
 
   // useful for debugging: https://cryptii.com/pipes/md5-hash
   hash_t result = (d,c,b,a);
-  printf("Hash: ");
-  mprint_hex((unsigned char *)&result, 16);
+//  printf("Hash: ");
+//  mprint_hex((unsigned char *)&result, 16);
   return result;
 }
 
