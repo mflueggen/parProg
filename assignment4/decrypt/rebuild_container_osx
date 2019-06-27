@@ -1,0 +1,3 @@
+#! /bin/sh
+
+docker-compose -f .devcontainer/docker-compose.other.yml build dev
