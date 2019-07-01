@@ -65,20 +65,21 @@ hash_t md5hash(word_t word) {
 //  printf("================= OPERATOR =============================\n");
 //  mprint_hex((unsigned char *)&word, 64);
 
-  unit_t a = 0x67452301;
-  unit_t b = 0xefcdab89;
-  unit_t c = 0x98badcfe;
-  unit_t d = 0x10325476;
+  const unit_t a = 0x67452301;
+  const unit_t b = 0xefcdab89;
+  const unit_t c = 0x98badcfe;
+  const unit_t d = 0x10325476;
   unit_t A = a;
   unit_t B = b;
   unit_t C = c;
   unit_t D = d;
 
+#pragma HLS PIPELINE
   for (iteration_ctr_t i = 0; i < ITERATION_RANGE; ++i) {
     const unit_t w = EXTRACT_UNIT(word, G[i]); //32bit word of the 512bit block. M[g] in pseudo code
     const unit_t k = K[i];
     const unit_index_t s = S[i];
-    // TODO implement the MD5 Hashing Algorithm
+
     unit_t F;
     if (0 <= i && i <= 15) {
       F = (B & C) | ((~B) & D);}
@@ -95,13 +96,13 @@ hash_t md5hash(word_t word) {
     C = B;
     B = B + ROTATE_LEFT(F,s);
   }
-  a = a + A;
-  b = b + B;
-  c = c + C;
-  d = d + D;
+  A = a + A;
+  B = b + B;
+  C = c + C;
+  D = d + D;
 
   // useful for debugging: https://cryptii.com/pipes/md5-hash
-  hash_t result = (d,c,b,a);
+  hash_t result = (D,C,B,A);
 //  printf("Hash: ");
 //  mprint_hex((unsigned char *)&result, 16);
   return result;
@@ -117,6 +118,7 @@ void hls_operator_md5hash(mtl_stream &in, mtl_stream &out, hash_t search) {
 
   snap_bool_t element_found = false;
 
+#pragma HLS PIPELINE
   do {
     input = in.read();
     candidate = md5hash(input.data);
