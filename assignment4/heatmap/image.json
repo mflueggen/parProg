@@ -1,0 +1,9 @@
+{
+    "target": "SNAP_N250",
+    "stream_bytes": 64,
+    "operators": {
+        "heatmap": {
+            "source": "hls_operator_heatmap"
+        }
+    }
+}

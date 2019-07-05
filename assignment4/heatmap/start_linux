@@ -1,0 +1,4 @@
+#! /bin/sh
+
+docker-compose -f .devcontainer/docker-compose.linux.yml up -d
+docker-compose -f .devcontainer/docker-compose.linux.yml exec dev /bin/bash
