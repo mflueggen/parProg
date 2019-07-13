@@ -12,6 +12,8 @@ services:
       - /dev/fuse
     cap_add:
       - SYS_ADMIN
+      - SYS_PTRACE
     security_opt:
-      - apparmor:unconfined
+      - apparmor=unconfined
+      - seccomp=unconfined
     working_dir: /workspace
