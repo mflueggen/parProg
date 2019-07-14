@@ -45,12 +45,35 @@ int main(int argc, char** argv) {
 
 
     //Get data
-    //TODO make it failsave (no guarantees)
     std::ifstream input(data_file);
     std::vector<double> data;
     std::string line;
     while (input >> line)
         data.push_back(std::stod(line));
+    int size_report[world_size];
+    int data_size = data.size();
+
+    MPI_Allgather(&data_size, 1, MPI_INT, size_report, 1, MPI_INT, MPI_COMM_WORLD);
+
+    bool distribute_data = false;
+    int data_source_rank = -1;
+    for (int i = world_size - 1; i >= 0 ; --i) {
+        if (size_report[i])
+            data_source_rank = i;
+        else
+            distribute_data = true;
+    }
+    if (data_source_rank == -1) {
+        std::cerr << "Input data not available to any rank." << std::endl;
+        exit(-1);
+    }
+    if (distribute_data) {
+        if (world_rank != data_source_rank)
+            data.resize(size_report[data_source_rank]);
+        MPI_Bcast(data.data(), size_report[data_source_rank], MPI_DOUBLE, data_source_rank, MPI_COMM_WORLD);
+    }
+
+
 
 
     int global_chunk = std::ceil(data.size() / (float) precision_size);
