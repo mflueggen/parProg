@@ -35,17 +35,19 @@ int main(int argc, char** argv) {
 // original rank for ordering
     MPI_Comm precision_comm;
     MPI_Comm_split(MPI_COMM_WORLD, color, world_rank, &precision_comm);
-
     int precision_rank, precision_size;
     MPI_Comm_rank(precision_comm, &precision_rank);
     MPI_Comm_size(precision_comm, &precision_size);
-    //TODO root communicator with the first ranks of each precision communicator (to efficiently exchange the results) or inter communicator?
+
+    color = precision_rank == 0 ? 1 : 0;
+    MPI_Comm root_comm;
+    MPI_Comm_split(MPI_COMM_WORLD, color, world_rank, &root_comm);
 
 
     //Get data
     //TODO make it failsave (no guarantees)
     std::ifstream input(data_file);
-    std::vector<double> data;//{5.666, 4.3234,7.3434,2.434,1.0};
+    std::vector<double> data;
     std::string line;
     while (input >> line)
         data.push_back(std::stod(line));
@@ -69,12 +71,18 @@ int main(int argc, char** argv) {
                precision_comm);
     global_avg /= data.size();
 
-    if (precision_rank == 0)
-        std::cout << global_avg << std::endl;
 
-    // TODO receive double preciison result.
+    if (precision_rank == 0) {
+        // Gather both averages on the global root process
+        double averages[2]; //we only have two rank in the root communicator
+        MPI_Gather(&global_avg, 1, MPI_DOUBLE, &averages, 1,
+                   MPI_DOUBLE, 0, root_comm);
 
-    //TODO send result to integer root via root communicator
+        if (world_rank == 0) {
+            std::cout << averages[1] << std::endl;
+            std::cout << averages[0] << std::endl;
+        }
+    }
 
 
     MPI_Comm_free(&precision_comm);
